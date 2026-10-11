@@ -204,6 +204,7 @@ class DomainResult:
     coefficient: Optional[float] = None
     contribution: Optional[float] = None
     inputs: dict = field(default_factory=dict)
+    input_contributions: dict = field(default_factory=dict)
     reasons: list = field(default_factory=list)
 
 
@@ -244,6 +245,57 @@ def domain_score(domain: str, spec: Optional[Mapping], zs: Mapping[str, ZScore])
     else:
         return DomainResult(domain, Status.MODEL_NOT_CONFIGURED, reasons=[f"Неизвестное правило {rule}"])
     return DomainResult(domain, Status.CALCULATED, score=score, inputs=vals)
+
+
+def attribute(domain: DomainResult, spec: Mapping, coefficient: float) -> None:
+    """Вклад ветки (коэффициент × доменная оценка) и его точное разложение по показателям.
+
+    Сумма вкладов показателей равна вкладу ветки: для mean — коэффициент × Z / n, для single —
+    коэффициент × Z, для weighted_sum — коэффициент × вес × Z, для max/min — выбранный показатель.
+    Это арифметика утверждённых правил; итог LMB BioAge отсюда не складывается.
+    """
+    if domain.status != Status.CALCULATED or domain.score is None:
+        return
+    vals = domain.inputs
+    rule = spec["rule"]
+    if rule == "mean":
+        parts = {i: coefficient * z / len(vals) for i, z in vals.items()}
+    elif rule == "weighted_sum":
+        parts = {i: coefficient * spec["weights"][i] * z for i, z in vals.items()}
+    elif rule in ("max", "min"):
+        pick = (max if rule == "max" else min)(vals, key=vals.get)
+        parts = {pick: coefficient * vals[pick]}
+    else:  # single
+        parts = {i: coefficient * z for i, z in vals.items()}
+    domain.coefficient = coefficient
+    domain.contribution = coefficient * domain.score
+    domain.input_contributions = parts
+
+
+def _inverse(kind: str, t: float) -> float:
+    if kind in ("identity", "raw"):
+        return t
+    if kind in ("ln1p", "log1p"):
+        return math.expm1(t)
+    if kind == "ln":
+        return math.exp(t)
+    if kind == "log10":
+        return 10 ** t
+    raise ValueError(kind)
+
+
+def trajectory(params: Mapping, sex: Sex, ages) -> list:
+    """Ожидаемое значение показателя по нормализации для заданного пола на каждом возрасте
+    и полоса ±1 ResidualSD — в исходных единицах показателя. Обратного пересчёта значения
+    в «возраст» нет (возрастные эквиваленты не утверждены)."""
+    s = LMB_SEX_CODE[sex]
+    out = []
+    for a in ages:
+        e = params["intercept"] + params["age_coef"] * a + params["sex_coef"] * s + params["age_sex_coef"] * a * s
+        sd = params["residual_sd"]
+        lo, hi = sorted((_inverse(params["transform"], e - sd), _inverse(params["transform"], e + sd)))
+        out.append({"age": a, "expected": _inverse(params["transform"], e), "lo": lo, "hi": hi})
+    return out
 
 
 # ---------------------------------------------------------------- интеграл

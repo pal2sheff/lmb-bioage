@@ -57,9 +57,10 @@ def run(base: str) -> None:
         page.on("request", lambda r: requests.append(r.url))
 
         page.goto(base)
-        expect(page.locator(".topbar")).to_contain_text("модуль 0.4.0", timeout=60000)
-        expect(page.get_by_text("Профиль появится здесь")).to_be_visible()
-        step("модуль загружен в браузер (Pyodide), версия показана")
+        expect(page.get_by_text("Профиль появится здесь")).to_be_visible(timeout=60000)
+        top = page.locator(".topbar").inner_text()
+        assert "модуль" not in top and "не валидирована" not in top, top
+        step("модуль загружен в браузер (Pyodide); шапка без служебных надписей")
 
         page.get_by_role("button", name="Синтетический пример").click()
         expect(page.locator(".branch")).to_have_count(9)
@@ -73,6 +74,24 @@ def run(base: str) -> None:
         page.wait_for_timeout(600)
         page.screenshot(path=SHOTS / "calc_01_example.png", full_page=False)
         step("синтетический пример: 9 веток, Metabolic 0,36, CAIDE 4, FRAX 6,5 %, итог заблокирован")
+
+        branches = page.locator("section[aria-labelledby=dv-branches]")
+        expect(branches.locator(".dv-row")).to_have_count(7)
+        met = branches.locator(".dv-row").filter(has_text="Metabolic")
+        expect(met).to_contain_text("+0,54")  # 1,5 × 0,36
+        expect(branches.locator(".dv-row.is-missing").filter(has_text="Cardio")).to_contain_text("нет вклада")
+        expect(branches).to_contain_text("не суммируются")
+        drivers = page.locator("section[aria-labelledby=dv-drivers] .dv-row")
+        assert drivers.count() >= 8, drivers.count()
+        traj = page.locator(".traj")
+        assert traj.count() >= 8, traj.count()
+        expect(page.locator(".traj").filter(has_text="eGFR").locator(".traj-dot")).to_have_count(1)
+        assert page.locator(".traj").filter(has_text="SCORE2").count() == 0  # Cardio не активирован — траектории нет
+        page.locator("section[aria-labelledby=dv-branches]").scroll_into_view_if_needed()
+        page.screenshot(path=SHOTS / "calc_03_charts.png", full_page=False)
+        page.locator(".traj-section").scroll_into_view_if_needed()
+        page.screenshot(path=SHOTS / "calc_04_trajectories.png", full_page=False)
+        step("графики: вклад 7 систем (без суммы), вклад показателей, траектории с точкой пациента")
 
         page.get_by_label("ЛПВП", exact=True).fill("abc")
         expect(page.get_by_role("status").filter(has_text="Проверьте ввод")).to_contain_text("ЛПВП: не число")

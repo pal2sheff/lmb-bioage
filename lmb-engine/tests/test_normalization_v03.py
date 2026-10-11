@@ -186,3 +186,48 @@ def test_end_to_end_numeric_with_test_substitutions(verified_score2):
     assert out["delta_years"] == pytest.approx(V03_INTERCEPT + sum(contrib.values()), abs=1e-12)
     assert out["bioage_years"] == pytest.approx(55 + out["delta_years"], abs=1e-12)
     assert doms["muscle"]["status"] == "not_included" and doms["adaptive"]["contribution"] is None
+
+
+# ------------------------------------------------------------------ вклады и траектории
+def test_domain_contributions_without_total():
+    """Вклад ветки = коэффициент × доменная оценка; без полной конфигурации итог не складывается."""
+    out = run(patient(), CFG)
+    assert out["status"] == "blocked" and out["contributions"] is None and out["delta_years"] is None
+    doms = by(out, "domains")
+    for d, w in V03_WEIGHTS.items():
+        dom = doms[d]
+        if dom["status"] == "calculated":
+            assert dom["coefficient"] == w
+            assert dom["contribution"] == pytest.approx(w * dom["score"], abs=1e-12)
+            assert sum(dom["input_contributions"].values()) == pytest.approx(dom["contribution"], abs=1e-12)
+        else:
+            assert dom["contribution"] is None and dom["input_contributions"] == {}
+    m = doms["metabolic"]["input_contributions"]
+    assert set(m) == {"homa_ir", "tyg", "aip", "whtr"}
+    assert m["tyg"] == pytest.approx(1.5 * out["zscores"]["tyg"]["z_clipped"] / 4)
+    assert doms["muscle"]["contribution"] is None and doms["adaptive"]["contribution"] is None
+
+
+def test_contributions_match_integral(verified_score2):
+    cfg = copy.deepcopy(CFG)
+    cfg["target_population"] = {"description": "ТЕСТОВАЯ ПОДСТАНОВКА"}
+    out = run(patient(), cfg)
+    doms = by(out, "domains")
+    assert out["contributions"] == pytest.approx({d: doms[d]["contribution"] for d in V03_WEIGHTS}, abs=1e-12)
+
+
+def test_trajectory_curve_matches_zscore():
+    out = run(patient(age=55), CFG)
+    tr = out["trajectories"]
+    assert "egfr" in tr and "score2" not in tr            # SCORE2 не активирован — траектории нет
+    for code, t in tr.items():
+        z = out["zscores"][code]
+        at = next(p for p in t["curve"] if p["age"] == 55)
+        p = CFG["normalization"][code]
+        exp_t = math.log1p(at["expected"]) if p["transform"] == "log1p" else at["expected"]
+        assert exp_t == pytest.approx(z["expected"], abs=1e-9), code
+        assert at["lo"] <= at["expected"] <= at["hi"]
+        assert t["curve"][0]["age"] == 40 and t["curve"][-1]["age"] == 70
+    egfr = tr["egfr"]
+    assert egfr["sign"] == -1 and egfr["curve"][0]["expected"] > egfr["curve"][-1]["expected"]   # с возрастом ниже
+    assert tr["acr"]["unit"] == "mg/g" and tr["acr"]["value"] == pytest.approx(17.68)

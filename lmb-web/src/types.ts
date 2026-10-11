@@ -105,10 +105,24 @@ export interface ZRes {
   reasons: string[];
 }
 
+/** Ожидаемое значение показателя по нормализации v0.3 в зависимости от возраста (±1 SD) и точка пациента. */
+export interface Trajectory {
+  label: string;
+  unit: string | null;
+  sign: 1 | -1;
+  age: number;
+  value: number;
+  z_raw: number;
+  z_clipped: number;
+  curve: { age: number; expected: number; lo: number; hi: number }[];
+}
+
 export interface DomainRes {
   domain: string;
   score: number | null;
   inputs?: Record<string, number>;
+  /** разложение вклада ветки по показателям (коэффициент ветки × доля Z по правилу объединения) */
+  input_contributions?: Record<string, number>;
   coefficient: number | null;
   contribution: number | null;
   status: Status;
@@ -130,6 +144,7 @@ export interface Run {
     indices: IndexRes[];
     domains: DomainRes[];
     zscores?: Record<string, ZRes>;
+    trajectories?: Record<string, Trajectory>;
     contributions: Record<string, number> | null;
     intercept: number;
     warnings: string[];

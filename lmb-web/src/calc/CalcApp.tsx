@@ -111,7 +111,7 @@ export function CalcApp() {
   }
 
   function save() {
-    const blob = new Blob([JSON.stringify({ format: FILE_FORMAT, version: 1, saved_at: new Date().toISOString(), form }, null, 1)], {
+    const blob = new Blob([JSON.stringify({ format: FILE_FORMAT, version: 1, saved_at: new Date().toISOString(), engine: engine?.meta ?? null, form }, null, 1)], {
       type: "application/json",
     });
     const a = document.createElement("a");
@@ -140,12 +140,7 @@ export function CalcApp() {
         <span className="wordmark">
           LMB <em>BioAge</em>
         </span>
-        <span className="research-flag">Тестовый калькулятор · модель не валидирована</span>
-        <span className="topbar-user muted small">
-          {engine
-            ? `модуль ${engine.meta.engine_version} · модель ${engine.meta.model_version} · конфигурация ${engine.meta.model_config_sha256.slice(0, 8)}`
-            : stage}
-        </span>
+        {!engine && !loadErr && <span className="topbar-user muted small">{stage}</span>}
       </header>
       <main className="calc-main">
         {loadErr && (
