@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+node_modules/
+dist/
+*.tsbuildinfo
+.env
+.env.*
+*.lmbenc
+/files/
+lmb-web/e2e/screens/

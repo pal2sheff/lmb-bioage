@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  engine:
+    name: Расчётный модуль
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Установка
+        run: pip install -e "lmb-engine[test]"
+      - name: Тесты
+        working-directory: lmb-engine
+        run: python -m pytest -q -rs
+
+  server-web:
+    name: Сервер, интерфейс и сквозная проверка
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: lmb-web/package-lock.json
+      - name: PostgreSQL 16 (только бинарные файлы; кластер поднимают сами тесты)
+        run: |
+          if ! ls /usr/lib/postgresql/16/bin/initdb >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y postgresql-16
+          fi
+          echo "/usr/lib/postgresql/16/bin" >> "$GITHUB_PATH"
+      - name: Установка Python-зависимостей
+        run: |
+          pip install -e lmb-engine
+          pip install -e "lmb-server[test]"
+          pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Тесты сервера
+        working-directory: lmb-server
+        run: python -m pytest -q -rf
+      - name: Сборка интерфейса
+        working-directory: lmb-web
+        run: |
+          npm ci
+          npm run build
+      - name: Сквозная проверка в браузере
+        working-directory: lmb-web
+        run: python e2e/run_e2e.py
+      - name: Снимки экрана сквозной проверки
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screens
+          path: lmb-web/e2e/screens/
+          if-no-files-found: ignore
