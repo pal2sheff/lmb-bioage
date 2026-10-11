@@ -6,7 +6,7 @@ import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -130,6 +130,13 @@ class ManualIn(BaseModel):
     national_model: str = Field(pattern="^Kazakhstan$")
     source_note: str = Field(min_length=3, max_length=300)
     attachment_id: Optional[uuid.UUID] = None
+
+    @model_validator(mode="after")
+    def _hip_not_above_major(self):
+        # риск перелома бедра не может превышать риск основных остеопоротических переломов (аудит 11.10.2026)
+        if self.frax_hip_10y_pct > self.frax_major_10y_pct:
+            raise ValueError("Риск перелома бедра больше риска основных остеопоротических переломов — проверьте перенос")
+        return self
 
 
 @router.post("/encounters/{encounter_id}/frax-manual", status_code=201)

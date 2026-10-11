@@ -227,3 +227,10 @@ def test_bound_manual_with_bmd_mismatch_still_rejected(world):
     assert d.post(f"/encounters/{eid}/frax-manual", json={**MANUAL, "with_bmd": True}).status_code == 422
     r = d.post(f"/encounters/{eid}/frax-manual", json=MANUAL)
     assert r.status_code == 201 and r.json()["inputs_bound"] is True
+
+
+def test_manual_frax_hip_above_major_rejected(world):
+    d = world["doctor_a"]
+    eid = _visit(d, questionnaire=False)
+    r = d.post(f"/encounters/{eid}/frax-manual", json={**MANUAL, "frax_major_10y_pct": 6.5, "frax_hip_10y_pct": 10})
+    assert r.status_code == 422

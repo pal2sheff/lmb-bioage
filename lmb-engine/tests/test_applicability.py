@@ -1,6 +1,8 @@
 """Применимость, пропуски и ошибки ввода (приложение З, ситуации B-xx)."""
 import datetime as dt
 
+import pytest
+
 from lmb_engine import indices as ix
 from lmb_engine.core import Encounter, Measurement, Qualifier, Review, Sex, Status
 from lmb_engine.pipeline import cardio_model_for_age
@@ -183,11 +185,26 @@ def test_out_of_technical_range():
     assert ix.bmi(enc(weight_kg=80, height_cm=17.5)).status == Status.INVALID_INPUT
 
 
-def test_acr_lab_discrepancy_kept():
+def test_acr_two_sources_require_choice():
+    """Оба значения ACR: без выбора источника результат ждёт решения врача (аудит 11.10.2026)."""
     r = ix.acr(enc(u_albumin=20, u_creatinine=10, acr_lab=Measurement(25, "mg/g")))
-    assert r.value == 2.0
-    assert r.extra["acr_lab"] == {"value": 25, "unit": "mg/g"}
-    assert r.warnings
+    assert r.status == Status.AWAITING_REVIEW and r.value is None
+    assert "выберите источник" in r.reasons[0]
+    assert r.extra["acr_lab"] == {"value": 25, "unit": "mg/g"} and r.extra["acr_calculated_mg_mmol"] == 2.0
+    lab = ix.acr(enc(u_albumin=20, u_creatinine=10, acr_lab=Measurement(25, "mg/g"), flags={"acr_source": "lab"}))
+    assert lab.status == Status.CALCULATED and lab.value == pytest.approx(25 / 8.84) and lab.extra["source"] == "lab"
+    calc = ix.acr(enc(u_albumin=20, u_creatinine=10, acr_lab=Measurement(25, "mg/g"),
+                      flags={"acr_source": "calculated"}))
+    assert calc.value == 2.0 and calc.extra["source"] == "calculated"
+
+
+def test_acr_single_source_used_and_named():
+    only_lab = ix.acr(enc(acr_lab=Measurement(3.0, "mg/mmol")))
+    assert only_lab.status == Status.CALCULATED and only_lab.value == 3.0 and only_lab.extra["source"] == "lab"
+    only_urine = ix.acr(enc(u_albumin=20, u_creatinine=10))
+    assert only_urine.value == 2.0 and only_urine.extra["source"] == "calculated"
+    missing = ix.acr(enc(flags={"acr_source": "lab"}))
+    assert missing.status == Status.MISSING_DATA and missing.missing_fields == ["acr_lab"]
 
 
 def test_asmi_needs_asm_not_smm():

@@ -28,10 +28,10 @@ export function ResearchToggle({ on, onChange }: { on: boolean; onChange: (v: bo
     <label className="research-toggle no-print">
       <span className="switch">
         <input type="checkbox" role="switch" checked={on} onChange={(e) => onChange(e.target.checked)}
-          aria-label="Исследовательский расчёт" />
+          aria-label="Исследовательский режим" />
         <span />
       </span>
-      Исследовательский расчёт и контроль PhenoAge
+      Исследовательский режим
     </label>
   );
 }

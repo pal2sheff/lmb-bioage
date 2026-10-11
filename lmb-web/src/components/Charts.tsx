@@ -46,7 +46,7 @@ export function BranchContributions({ domains, catalog, intercept, total }: {
   const miss = V03.map((c) => dom.get(c)!).filter((d) => d && d.contribution === null);
   done.sort((a, b) => (b.contribution ?? 0) - (a.contribution ?? 0));
   const max = Math.max(0.5, ...done.map((d) => Math.abs(d.contribution ?? 0)));
-  const extra = catalog.branches.filter((b) => !V03.includes(b.code)).map((b) => b.title);
+  const extra = catalog.branches.filter((b) => !V03.includes(b.code)).map((b) => b.name);
   return (
     <section className="dv-card" aria-labelledby="dv-branches">
       <header className="dv-head">
@@ -58,10 +58,9 @@ export function BranchContributions({ domains, catalog, intercept, total }: {
       </header>
       <div className="dv-rows" role="table" aria-label="Вклад веток в расчётную оценку">
         {done.map((d) => (
-          <div key={d.domain} className="dv-row" role="row" title={`${title[d.domain]?.title}: доменная оценка ${fmt(d.score, 2)} × коэффициент ${fmt(d.coefficient, 1)} = ${signed(d.contribution!)}`}>
+          <div key={d.domain} className="dv-row" role="row" title={`${title[d.domain]?.name}: доменная оценка ${fmt(d.score, 2)} × коэффициент ${fmt(d.coefficient, 1)} = ${signed(d.contribution!)}`}>
             <span className="dv-label" role="cell">
               <strong>{title[d.domain]?.name}</strong>
-              <span className="muted small">{title[d.domain]?.title}</span>
             </span>
             <Bar value={d.contribution!} max={max} />
             <span className="dv-val num" role="cell">
@@ -74,7 +73,6 @@ export function BranchContributions({ domains, catalog, intercept, total }: {
           <div key={d.domain} className="dv-row is-missing" role="row">
             <span className="dv-label" role="cell">
               <strong>{title[d.domain]?.name}</strong>
-              <span className="muted small">{title[d.domain]?.title}</span>
             </span>
             <span className="dv-track dv-empty" aria-hidden="true">
               <span className="dv-axis" />

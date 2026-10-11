@@ -163,7 +163,7 @@ def test_clip_keeps_raw():
 
 def test_bone_uses_major_only():
     a = run(patient(), CFG)["zscores"]["frax_major"]["z_raw"]
-    b = run(patient(frax_hip_10y_pct=Measurement(9.0, "%")), CFG)["zscores"]["frax_major"]["z_raw"]
+    b = run(patient(frax_hip_10y_pct=Measurement(4.0, "%")), CFG)["zscores"]["frax_major"]["z_raw"]
     assert a == b
 
 

@@ -14,6 +14,7 @@ from pathlib import Path
 
 from .core import Encounter, IndexResult, Sex, Status, Tri
 from .cardio import score2, score2_op
+from .consistency import acr_lab_mg_mmol, cbc_issue, frax_issue
 from .gate import Gate
 from .units import ACR_MGMMOL_TO_MGG, CREATININE_UMOL_PER_MGDL, GLUCOSE_MMOL_TO_MGDL, TG_MMOL_TO_MGDL
 
@@ -143,25 +144,61 @@ def egfr_ckdepi_cr_2021(enc: Encounter) -> IndexResult:
     return g.result(v, "mL/min/1.73m2", {"scr_mg_dl": scr})
 
 
+ACR_SOURCES = ("lab", "calculated")
+
+
 def acr(enc: Encounter) -> IndexResult:
-    """ACR из альбумина и креатинина одной порции мочи; готовый ACR лаборатории — отдельно."""
+    """ACR, мг/ммоль. Источник выбирается явно (аудит 11.10.2026):
+
+    - готовый ACR лаборатории (acr_lab, мг/ммоль или мг/г);
+    - расчёт по альбумину и креатинину одной порции мочи.
+    Если есть оба значения, источник указывает врач (флаг acr_source = lab | calculated); без выбора
+    результат ждёт решения и в домен не входит. Если значение одно — используется оно; источник
+    записывается в результат.
+    """
     g = Gate(enc, "acr", 1)
-    alb = g.value("u_albumin")
-    cr = g.value("u_creatinine")
-    g.same_sample("u_albumin", "u_creatinine", label="альбумин и креатинин мочи")
-    if g.blocked():
+    present = lambda k: enc.measurements.get(k) is not None and enc.measurements[k].value is not None  # noqa: E731
+    have_lab = present("acr_lab")
+    have_urine = present("u_albumin") or present("u_creatinine")
+    choice = enc.flags.get("acr_source") if enc.flags.get("acr_source") in ACR_SOURCES else None
+    extra: dict = {}
+
+    lab = None
+    if have_lab:
+        m = enc.measurements["acr_lab"]
+        extra["acr_lab"] = {"value": m.value, "unit": m.unit}
+        lab, problem = acr_lab_mg_mmol(enc)
+        if problem:
+            g.invalid.append(problem)
+            g.invalid_fields.append("acr_lab")
+        else:
+            extra["acr_lab_mg_mmol"] = lab
+
+    calc = None
+    if choice != "lab" and (have_urine or not have_lab or choice == "calculated"):
+        alb = g.value("u_albumin")
+        cr = g.value("u_creatinine")
+        g.same_sample("u_albumin", "u_creatinine", label="альбумин и креатинин мочи")
+        if alb is not None and cr is not None:
+            calc = alb / cr
+            extra["acr_calculated_mg_mmol"] = calc
+    if choice == "lab" and not have_lab:
+        g.missing.append("acr_lab")
+
+    if lab is not None and calc is not None and choice is None:
+        g.review.append(f"Есть два значения ACR: лаборатории {lab:.2f} мг/ммоль и расчётное {calc:.2f} мг/ммоль — "
+                        f"выберите источник")
+        extra["source"] = None
+        return g.result(None, "mg/mmol", extra)
+    if choice == "lab" or (choice is None and lab is not None and calc is None and not have_urine):
+        value, source = lab, "lab"
+    else:
+        value, source = calc, "calculated"
+    if g.blocked() or value is None:
         return g.result()
-    mg_mmol = alb / cr
-    extra = {"acr_mg_g": mg_mmol * ACR_MGMMOL_TO_MGG}
-    lab = enc.measurements.get("acr_lab")
-    if lab is not None and lab.value is not None:
-        lab_mg_mmol = {"mg/mmol": lab.value, "mg/g": lab.value / ACR_MGMMOL_TO_MGG}.get(lab.unit)
-        extra["acr_lab"] = {"value": lab.value, "unit": lab.unit}
-        if lab_mg_mmol is not None:
-            extra["acr_lab_vs_calc_diff_mg_mmol"] = lab_mg_mmol - mg_mmol
-            if abs(lab_mg_mmol - mg_mmol) > 1e-9:
-                g.warnings.append("Готовый ACR лаборатории отличается от вычисленного; источник для домена выбирает врач")
-    return g.result(mg_mmol, "mg/mmol", extra)
+    extra["source"] = source
+    extra["acr_mg_g"] = value * ACR_MGMMOL_TO_MGG
+    return g.result(value, "mg/mmol", extra)
 
 
 # ---------------------------------------------------------------- Hepatic
@@ -188,6 +225,7 @@ def fib4(enc: Encounter) -> IndexResult:
 # ---------------------------------------------------------------- Inflammation
 def _cbc_rules(g: Gate, keys) -> None:
     g.same_sample(*keys, label="показатели общего анализа крови")
+    g.consistent(cbc_issue(g.enc))
     g.exclude_if_yes("acute_infection", "Острая инфекция или значимое воспаление", unknown_to_review=False,
                      unknown_warning=True)
 
@@ -333,20 +371,22 @@ def frax_kz(enc: Encounter) -> IndexResult:
         return g.result()
     major = g.value("frax_major_10y_pct")
     hip = g.value("frax_hip_10y_pct")
+    g.consistent(frax_issue(enc))
     if g.blocked():
         return g.result()
     if g.not_applicable:
         return g.result()   # результат вне области применения не принимается
     with_bmd = enc.flags.get("frax_with_bmd")
     source = enc.flags.get("frax_source")
-    extra = {"hip_10y_pct": hip, "with_bmd": with_bmd, "source": source, "national_model": "Kazakhstan",
+    extra = {"hip_10y_pct": hip, "major_10y_pct": major, "with_bmd": with_bmd, "source": source,
+             "national_model": "Kazakhstan", "transferred_from_official_frax": source == "manual",
              "inputs_bound": enc.flags.get("frax_inputs_bound", True)}
     if extra["inputs_bound"] is False:
         g.warnings.append("Ручной результат FRAX внесён без полного набора факторов риска в системе")
     return g.result(major, "%", extra)
 
 
-# ---------------------------------------------------------------- контроль: PhenoAge
+# ---------------------------------------------------------------- PhenoAge (самостоятельный показатель)
 PHENOAGE_FILE = Path(__file__).resolve().parents[1] / "config" / "algorithms" / "phenoage_2018.json"
 PHENOAGE_INPUTS = ("albumin_serum", "creatinine_serum", "glucose_fasting", "crp", "lymphocytes_abs", "wbc",
                    "mcv", "rdw", "alp")
@@ -377,7 +417,8 @@ def phenoage_from(p: dict, albumin_gl: float, creatinine_umol: float, glucose_mm
 
 
 def phenoage(enc: Encounter, params: dict = None) -> IndexResult:
-    """PhenoAge (фенотипический возраст), годы — контрольный ориентир, в LMB v0.3 не входит.
+    """PhenoAge (фенотипический возраст), годы — самостоятельный показатель; с LMB не сравнивается
+    и в LMB не входит (решение владельца 11.10.2026).
 
     Лимфоциты, % = лимфоциты абс. / лейкоциты × 100 (один общий анализ крови).
     """
@@ -386,13 +427,12 @@ def phenoage(enc: Encounter, params: dict = None) -> IndexResult:
     age = g.age()
     v = {k: g.value(k) for k in PHENOAGE_INPUTS}
     g.same_sample("lymphocytes_abs", "wbc", "mcv", "rdw", label="показатели общего анализа крови")
+    g.consistent(cbc_issue(enc))
     _fasting_rules(g)
     ap = p["applicability"]
     if age is not None and not ap["age_min"] <= age <= ap["age_max"]:
         g.not_applicable.append(f"Возраст {age} вне выборки разработки PhenoAge ({ap['age_min']}–{ap['age_max']} лет)")
         return g.result()          # вне выборки разработки число не выдаётся (как CAIDE)
-    if v["lymphocytes_abs"] is not None and v["wbc"] is not None and v["lymphocytes_abs"] > v["wbc"]:
-        g.invalid.append("Лимфоциты абс. больше лейкоцитов")
     g.exclude_if_yes("acute_infection", "Острая инфекция или значимое воспаление", unknown_to_review=False,
                      unknown_warning=True)
     if g.blocked():
@@ -401,9 +441,9 @@ def phenoage(enc: Encounter, params: dict = None) -> IndexResult:
     out = phenoage_from(p, v["albumin_serum"], v["creatinine_serum"], v["glucose_fasting"], v["crp"], lymph_pct,
                         v["mcv"], v["rdw"], v["alp"], v["wbc"], age)
     if not p["verification"]["reference_cases_verified"]:
-        g.warnings.append("PhenoAge: контрольные случаи ещё не сверены")
+        g.warnings.append("Расчёт PhenoAge ещё не сверен с внешним калькулятором на эталонных наборах входов")
     return g.result(out["phenoage"], "years", {
-        "role": "control_reference", "lymphocyte_percent": lymph_pct, "xb": out["xb"],
+        "role": "independent_age_indicator", "lymphocyte_percent": lymph_pct, "xb": out["xb"],
         "mortality_10y": out["mortality_10y"], "params_version": p["version"], "params_sha256": p["_sha256"]})
 
 

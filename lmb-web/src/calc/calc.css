@@ -54,8 +54,9 @@ input.is-bad { border-color: var(--error); background: var(--burgundy-soft); }
   .report-table { font-size: 14px; }
   .report-table th:nth-child(4), .report-table td:nth-child(4) { display: none; }
   /* на телефоне все четыре раздела видны сразу: сетка 2×2 вместо прокрутки */
-  .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 0; overflow: visible; }
-  .tabs .tab { padding: 0 8px; font-size: 15px; justify-content: center; height: 44px; }
+  .tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; overflow: visible; }
+  .tabs .tab { padding: 0 4px; gap: 4px; min-width: 0; font-size: 14px; justify-content: center; height: 44px; }
+  .tabs .tab-step { display: none; }
 }
 @page { size: A4; margin: 12mm 12mm 14mm; }
 @media print {
@@ -76,3 +77,29 @@ input.is-bad { border-color: var(--error); background: var(--burgundy-soft); }
   .report .research-card, .report .card, .report .status-line { border-color: #bbb; }
   .report details.details-card > :not(summary) { display: block; }
 }
+/* верхняя панель: черновик и меню тестирования */
+.topbar-tools { margin-left: auto; display: flex; gap: 12px; align-items: center; }
+.draft-status { white-space: nowrap; }
+.test-menu { position: relative; }
+.test-menu > summary { list-style: none; cursor: pointer; height: 38px; display: inline-flex; align-items: center;
+  padding: 0 14px; border: 1px solid var(--rule-strong); border-radius: 10px; font-weight: 600; font-size: 14px; }
+.test-menu > summary::-webkit-details-marker { display: none; }
+.test-menu > summary::after { content: "▾"; margin-left: 6px; color: var(--muted); }
+.test-menu-body { position: absolute; right: 0; top: 44px; z-index: 30; background: var(--card); border: 1px solid var(--rule);
+  border-radius: 12px; box-shadow: 0 8px 24px rgba(32, 40, 45, 0.12); padding: 12px; min-width: 280px;
+  display: flex; flex-direction: column; gap: 6px; }
+.test-menu-body p { margin: 0 4px 4px; }
+.test-menu-body button { text-align: left; background: none; border: 0; padding: 10px 12px; border-radius: 8px;
+  font: inherit; cursor: pointer; }
+.test-menu-body button:hover { background: var(--accent-soft); }
+.tab-step { display: inline-flex; width: 22px; height: 22px; border-radius: 50%; align-items: center; justify-content: center;
+  font-size: 12px; background: var(--paper-2, #eef1ee); color: var(--ink-2); }
+.tab.active .tab-step { background: var(--accent); color: #fff; }
+/* поле с ошибкой и подтверждение смены единицы */
+.calc-row.has-error { background: color-mix(in srgb, var(--burgundy) 5%, transparent); border-radius: 8px; }
+.calc-row.flash { animation: flash 1.6s ease-out; }
+@keyframes flash { 0% { background: color-mix(in srgb, var(--accent) 22%, transparent); } 100% { background: transparent; } }
+.unit-confirm { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 12px;
+  background: var(--accent-soft); border-radius: 8px; font-size: 14px; }
+.unit-confirm > span { flex-basis: 100%; }
+@media (max-width: 760px) { .draft-status { display: none; } }

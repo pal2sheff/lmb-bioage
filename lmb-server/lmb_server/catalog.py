@@ -37,11 +37,13 @@ QUESTIONNAIRE_ITEMS = {
                                 "с потоотделением и учащением дыхания", ("active", "inactive", "unknown")),
     "education_years": ("Полные годы обучения (школа, колледж, вуз)", "integer"),
     "fn_bmd_device_make": ("Производитель денситометра (для МПК в г/см²)", None),
+    # источник ACR при наличии готового и расчётного значения (аудит 11.10.2026): выбирает врач
+    "acr_source": ("Источник ACR для расчёта", ("lab", "calculated", "unknown")),
     "frax_assumed_no": ("Факторы FRAX, отмеченные врачом «нет — сведений нет»", "frax_list"),
 }
 
 # Пункты, которые подтверждает только врач (пациент может ответить «не знаю»)
-DOCTOR_ONLY_ITEMS = {"ascvd", "ckd_known", "fh", "very_high_single_risk_factor", "acute_kidney_change",
+DOCTOR_ONLY_ITEMS = {"acr_source", "ascvd", "ckd_known", "fh", "very_high_single_risk_factor", "acute_kidney_change",
                      "creatinine_idms", "acute_liver_condition", "acute_infection", "frax_assumed_no",
                      "secondary_osteoporosis", "rheumatoid_arthritis"}
 FRAX_RISK_FACTORS = ("prior_fragility_fracture", "parent_hip_fracture", "smoking_current", "glucocorticoids",
@@ -70,7 +72,7 @@ def validate_answer(code: str, value: str) -> str | None:
     return None if value in allowed else f"{code}: допустимо {allowed}"
 
 
-# входы только контрольного PhenoAge: хранятся, но в LMB v0.3 не входят
+# входы только PhenoAge (самостоятельный показатель): хранятся, но в LMB v0.3 не входят
 CONTROL_ONLY_INPUTS = ("wbc", "mcv", "rdw", "albumin_serum", "crp", "alp")
 
 
@@ -96,14 +98,14 @@ OBSERVATION_GROUPS = [
     ("Почки", ["creatinine_serum", "u_albumin", "u_creatinine", "acr_lab"]),
     ("Печень", ["ast", "alt"]),
     ("Общий анализ крови", ["platelets", "neutrophils_abs", "lymphocytes_abs", "wbc", "mcv", "rdw"]),
-    ("Контроль PhenoAge: биохимия", ["albumin_serum", "crp", "alp"]),
+    ("Дополнительные показатели для PhenoAge", ["albumin_serum", "crp", "alp"]),
     ("Минеральная плотность шейки бедра", ["fn_tscore", "fn_bmd"]),
     ("Мышцы (Visbody)", ["visbody_asm"]),
 ]
 
 QUESTIONNAIRE_GROUPS = [
     ("Условия обследования", ["fasting_status", "creatinine_idms", "acute_infection", "acute_kidney_change",
-                              "acute_liver_condition"]),
+                              "acute_liver_condition", "acr_source"]),
     ("Анамнез", ["diabetes", "insulin_therapy", "ascvd", "ckd_known", "fh", "very_high_single_risk_factor"]),
     ("Образ жизни и образование", ["smoking_current", "alcohol_3plus", "physical_activity_caide", "education_years"]),
     ("Факторы FRAX", ["prior_fragility_fracture", "parent_hip_fracture", "glucocorticoids", "rheumatoid_arthritis",
@@ -127,7 +129,7 @@ INDEX_LABELS = {
     "caide": ("CAIDE", "20-летний риск деменции, баллы"),
     "frax_kz": ("FRAX", "10-летний риск переломов, модель Казахстана"),
     "asmi": ("ASMI", "Индекс мышечной массы конечностей"),
-    "phenoage": ("PhenoAge", "Фенотипический возраст (Levine 2018), контрольный ориентир"),
+    "phenoage": ("PhenoAge", "Фенотипический возраст (Levine 2018)"),
 }
 
 BRANCHES = [
@@ -143,8 +145,23 @@ BRANCHES = [
 ]
 
 
+def unit_factors(code: str) -> dict:
+    """Множители перевода единицы в каноническую (все конверсии справочника линейны) — для явного
+    пересчёта введённого значения в интерфейсе при смене единицы. Источник — справочник движка."""
+    if code == "acr_lab":
+        return {"mg/mmol": 1.0, "mg/g": 1 / 8.84}
+    d = INPUTS.get(code)
+    if d is None:
+        return {}
+    out = {}
+    for u, f in d.conversions.items():
+        if abs(f(0.0)) < 1e-12:
+            out[u] = f(1.0)
+    return out
+
+
 def ui_catalog(definitions: list) -> dict:
-    defs = {d["code"]: d for d in definitions}
+    defs = {d["code"]: {**d, "unit_factors": unit_factors(d["code"])} for d in definitions}
     return {
         "observation_groups": [{"title": t, "items": [defs[c] for c in codes if c in defs]}
                                for t, codes in OBSERVATION_GROUPS],
