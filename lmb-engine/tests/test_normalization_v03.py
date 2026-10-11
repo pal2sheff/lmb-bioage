@@ -2,7 +2,7 @@
 
 Числа таблицы ниже — дословная копия раздела 3 документа; тест сверяет с ней конфигурацию.
 Сквозной численный пример использует синтетического пациента и две тестовые подстановки
-(целевая популяция и отметка сверки SCORE2), которых в рабочей конфигурации нет.
+(целевая популяция и отметка сверки SCORE2); сверка SCORE2 с 11.10.2026 есть и в рабочих параметрах.
 """
 import copy
 import math
@@ -70,6 +70,13 @@ def test_domain_rules():
 def test_config_status():
     c = check_config(CFG)
     assert c.valid and c.gaps == ["target_population"]
+    # решение владельца 11.10.2026: клиническая популяция и референтная выборка не заданы,
+    # техническая область тестирования хранится отдельно
+    assert CFG["target_population"] is None and CFG["reference_sample"] is None
+    assert CFG["research_mode"] == "local_synthetic"
+    rp = CFG["research_population"]
+    assert (rp["age_min"], rp["age_max"], rp["score2_region"]) == (40, 64, "high")
+    assert any("Клиническая валидация не проведена" in x for x in CFG["research_limitations"])
     assert CFG["scientific_status"] == "not_validated" and CFG["synthetic_parameters"] is False
     assert "24.09.2026" in CFG["parameters_source"]["origin"]
 
@@ -167,11 +174,104 @@ def test_score2op_not_normalized(verified_score2):
 
 
 def test_shipped_config_blocks_integral():
+    """Клинический итог по-прежнему заблокирован: нет целевой популяции."""
     out = run(patient(), CFG)
     assert out["status"] == "blocked" and out["bioage_years"] is None and out["delta_years"] is None
-    text = " ".join(out["blocking_reasons"])
-    assert "target_population" in text and "Домен cardio" in text
-    assert by(out, "domains")["metabolic"]["status"] == "calculated"     # остальные домены считаются
+    assert out["blocking_reasons"] == ["Конфигурация модели неполная: target_population"]
+    assert all(d["status"] == "calculated" for d in out["domains"] if d["domain"] in V03_WEIGHTS)
+
+
+# ------------------------------------------------------------------ исследовательский расчёт
+def test_research_calculated_without_target_population():
+    out = run(patient(), CFG)
+    r = out["research"]
+    assert r["status"] == "calculated" and r["mode"] == "local_synthetic" and r["reasons"] == []
+    assert r["target_population"] is None and r["reference_sample"] is None
+    assert r["scientific_status"] == "not_validated" and r["model_config_sha256"] == out["model_config_sha256"]
+    doms = by(out, "domains")
+    contrib = {d: V03_WEIGHTS[d] * doms[d]["score"] for d in V03_WEIGHTS}
+    assert r["contributions"] == pytest.approx(contrib, abs=1e-12)
+    assert r["intercept"] == 0.08
+    assert r["delta_years"] == pytest.approx(math.fsum([0.08, *contrib.values()]), abs=1e-12)
+    assert r["bioage_years"] == pytest.approx(55 + r["delta_years"], abs=1e-12)
+    assert set(r["contributions"]) == set(V03_WEIGHTS)             # Muscle и Adaptive не входят
+    # клинический итог при этом не появляется
+    assert out["bioage_years"] is None and out["contributions"] is None
+
+
+def test_research_keeps_all_other_checks():
+    """Переключатель режима не снимает проверок: пропуск домена или неприменимость блокируют расчёт."""
+    no_insulin = run(patient(insulin_fasting=None), CFG)["research"]
+    assert no_insulin["status"] == "blocked" and no_insulin["bioage_years"] is None
+    assert any(x.startswith("Домен metabolic") for x in no_insulin["reasons"])
+    diab = run(enc(age=55, sex=Sex.FEMALE, flags={**FLAGS, "diabetes": "yes"}, **VALUES), CFG)["research"]
+    assert diab["status"] == "blocked" and any(x.startswith("Домен cardio") for x in diab["reasons"])
+    bad = copy.deepcopy(CFG)
+    bad["integral"]["weights"]["renal"] = 1.0
+    assert any("недопустима" in x for x in run(patient(), bad)["research"]["reasons"])
+    gap = copy.deepcopy(CFG)
+    gap["normalization"]["fib4"]["residual_sd"] = None
+    assert "normalization.fib4.residual_sd" in " ".join(run(patient(), gap)["research"]["reasons"])
+
+
+@pytest.mark.parametrize("age,status", [(39, "not_applicable"), (40, "calculated"), (64, "calculated"),
+                                        (65, "not_applicable")])
+def test_research_population_age_bounds(age, status):
+    r = run(patient(age=age), CFG)["research"]
+    assert r["status"] == status, r["reasons"]
+    if status == "not_applicable":
+        assert r["bioage_years"] is None and any("вне технической области" in x for x in r["reasons"])
+
+
+def test_research_without_mode_not_configured():
+    cfg = copy.deepcopy(CFG)
+    cfg.pop("research_mode")
+    assert run(patient(), cfg)["research"]["status"] == "model_not_configured"
+
+
+def test_score2_normalization_not_transferred_to_op():
+    """70+ лет: SCORE2-OP считается как клинический индекс, но Z Cardio по нормализации SCORE2 нет."""
+    out = run(enc(age=72, sex=Sex.MALE, flags=FLAGS, **VALUES), CFG)
+    idx = by(out, "indices")
+    assert idx["score2_op"]["status"] == "calculated" and idx["score2"]["status"] == "not_applicable"
+    assert out["zscores"]["score2"]["status"] == "not_applicable"
+    assert by(out, "domains")["cardio"]["status"] != "calculated"
+
+
+def test_cardio_z_matches_owner_check_hs11_hs12():
+    """Решение 11.10.2026, раздел 3: 55 лет, САД 120, ОХС 4,5, ЛПВП 1,5, без курения —
+    ожидание v0.3 0,708 % (ж) и 0,939 % (м); при HeartScore 2,6 % и 3,5 % Z ≈ +2,04 и +2,31."""
+    for sex, code, hs, z_exp in [(Sex.FEMALE, 0, 2.6, 2.04), (Sex.MALE, 1, 3.5, 2.31)]:
+        p = CFG["normalization"]["score2"]
+        e = p["intercept"] + p["age_coef"] * 55 + p["sex_coef"] * code + p["age_sex_coef"] * 55 * code
+        assert round(math.expm1(e), 3) == {0: 0.708, 1: 0.939}[code]   # SCORE2 подаётся в %
+        assert manual_z("score2", hs, 55, code)[0] == pytest.approx(z_exp, abs=0.005)
+
+
+# ------------------------------------------------------------------ ступени CAIDE
+@pytest.mark.parametrize("sex", [Sex.FEMALE, Sex.MALE])
+@pytest.mark.parametrize("a,b,expected", [(46, 47, 2.91), (53, 54, 0.90)])
+def test_caide_step_brain_contribution(sex, a, b, expected):
+    """Переход через границу шкалы при прочих равных: балл возраста растёт на 3 (46→47) и на 1 (53→54);
+    вклад Brain (вес 1,2) растёт примерно на 2,91 и 0,90 — это свойство шкалы, а не изменение здоровья."""
+    # 7 лет обучения (2 балла) и низкая активность (1 балл): Z не упирается в ±3 по обе стороны границы
+    fl = {**FLAGS, "education_years": "8", "physical_activity_caide": "inactive"}
+    ra, rb = (run(enc(age=x, sex=sex, flags=fl, **VALUES), CFG) for x in (a, b))
+    ia, ib = by(ra, "indices")["caide"], by(rb, "indices")["caide"]
+    assert ib["value"] - ia["value"] == (3 if a == 46 else 1)
+    assert ia["extra"]["age_band"]["band"] != ib["extra"]["age_band"]["band"]
+    za, zb = ra["zscores"]["caide"], rb["zscores"]["caide"]
+    assert abs(za["z_raw"]) < 3 and abs(zb["z_raw"]) < 3              # без ограничения ±3
+    da, db = by(ra, "domains")["brain"], by(rb, "domains")["brain"]
+    step = db["contribution"] - da["contribution"]
+    assert step > 0 and step == pytest.approx(expected, abs=0.01)
+
+
+def test_caide_step_crossings():
+    from lmb_engine.indices import caide_age_band, caide_step_crossings
+    assert caide_step_crossings(46, 47) == [47] and caide_step_crossings(53, 54) == [54]
+    assert caide_step_crossings(60, 45) == [47, 54] and caide_step_crossings(48, 53) == []
+    assert [caide_age_band(a)["points"] for a in (46, 47, 53, 54)] == [0, 3, 3, 4]
 
 
 def test_end_to_end_numeric_with_test_substitutions(verified_score2):
@@ -219,7 +319,7 @@ def test_contributions_match_integral(verified_score2):
 def test_trajectory_curve_matches_zscore():
     out = run(patient(age=55), CFG)
     tr = out["trajectories"]
-    assert "egfr" in tr and "score2" not in tr            # SCORE2 не активирован — траектории нет
+    assert "egfr" in tr and "score2" in tr                # SCORE2 сверен с HeartScore 11.10.2026
     for code, t in tr.items():
         z = out["zscores"][code]
         at = next(p for p in t["curve"] if p["age"] == 55)

@@ -14,7 +14,7 @@ from .cardio import model_for_age
 from .core import Encounter, Status, age_full_years, is_finite_number
 from .indices import run_all
 from .model import (ALL_DOMAINS, UNIT_CONVERSIONS, IntegralResult, ZScore, _inverse, attribute, check_config,
-                    config_sha256, domain_score, integral, trajectory, zscore)
+                    config_sha256, domain_score, integral, research_integral, trajectory, zscore)
 
 
 cardio_model_for_age = model_for_age  # совместимость с версией 0.1.0
@@ -84,6 +84,7 @@ def run(enc: Encounter, config: Mapping, external: Optional[Mapping[str, float]]
         for d in config["integral"]["required_domains"]:
             attribute(domains[d], config["domains"][d], weights[d])
     integ: IntegralResult = integral(domains, config, age, check)
+    research = research_integral(domains, config, age, check)   # отдельный блок, не клинический итог
 
     # траектории: ожидаемое значение по нормализации от возраста (±1 SD) и точка пациента
     trajectories = {}
@@ -130,4 +131,5 @@ def run(enc: Encounter, config: Mapping, external: Optional[Mapping[str, float]]
         "warnings": warnings,
         "missing_fields": sorted({f for r in indices.values() for f in r.missing_fields} | set(check.gaps)),
         "blocking_reasons": integ.blocking_reasons,
+        "research": research,
     }

@@ -117,6 +117,23 @@ export interface Trajectory {
   curve: { age: number; expected: number; lo: number; hi: number }[];
 }
 
+/** Исследовательский расчёт неизменённой v0.3 (режим local_synthetic); не клинический итог. */
+export interface ResearchRes {
+  status: "calculated" | "blocked" | "not_applicable" | "model_not_configured";
+  mode: string | null;
+  model_version: string;
+  model_config_sha256: string;
+  scientific_status: string;
+  research_population: { description: string; age_min: number; age_max: number } | null;
+  intercept: number;
+  contributions: Record<string, number> | null;
+  domain_scores: Record<string, number> | null;
+  delta_years: number | null;
+  bioage_years: number | null;
+  limitations: string[];
+  reasons: string[];
+}
+
 export interface DomainRes {
   domain: string;
   score: number | null;
@@ -145,6 +162,7 @@ export interface Run {
     domains: DomainRes[];
     zscores?: Record<string, ZRes>;
     trajectories?: Record<string, Trajectory>;
+    research?: ResearchRes;
     contributions: Record<string, number> | null;
     intercept: number;
     warnings: string[];

@@ -1,31 +1,31 @@
 case,model,age,sex,smoker,sbp_mmhg,tc_mmol_l,hdl_mmol_l,hs_birth_month,hs_check_date,hs_result,source
-HS01,score2,40,male,0,120,4.5,1.5,01/1986,2026-10-10,1%,"Владелец, LMB_Claude_Data_1, раздел 7; HeartScore Europe high risk"
-HS02,score2,40,female,0,120,4.5,1.5,01/1986,2026-10-10,<1%,"Владелец, LMB_Claude_Data_1, раздел 7; HeartScore Europe high risk"
-HS03,score2,40,male,1,160,6.5,1.0,01/1986,2026-10-10,11%,"Владелец, LMB_Claude_Data_1, раздел 7; HeartScore Europe high risk"
-HS04,score2,40,female,1,160,6.5,1.0,01/1986,2026-10-10,"8,8%","Владелец, LMB_Claude_Data_1, раздел 7; HeartScore Europe high risk"
-C01,score2,40,male,0,180,4.8,1.4,,,,
-C02,score2,69,female,0,130,5.1,1.2,,,,
-C03,score2,51,male,0,105,3.9,1.2,,,,
-C04,score2,47,female,0,160,4.8,0.9,,,,
-C05,score2,61,male,1,160,6.0,2.2,,,,
-C06,score2,65,female,0,125,7.2,1.1,,,,
-C07,score2,41,male,1,150,7.0,1.2,,,,
-C08,score2,63,female,0,165,5.8,1.7,,,,
-C09,score2,66,male,0,165,4.0,0.8,,,,
-C10,score2,48,female,0,140,4.2,1.7,,,,
-C11,score2,50,male,0,165,4.2,1.6,,,,
-C12,score2,52,female,0,140,6.0,1.6,,,,
-C13,score2,50,male,0,145,5.1,0.9,,,,
-C14,score2,51,female,1,140,3.7,0.8,,,,
-C15,score2,48,male,0,135,6.4,1.2,,,,
-C16,score2,60,female,1,130,4.2,1.8,,,,
-C21,score2_op,70,male,1,165,6.9,0.9,,,,
-C22,score2_op,89,female,0,175,7.0,1.1,,,,
-C23,score2_op,82,male,1,180,5.0,2.1,,,,
-C24,score2_op,86,female,1,130,6.7,1.8,,,,
-C25,score2_op,73,male,0,160,6.9,2.2,,,,
-C26,score2_op,70,female,0,105,4.8,1.3,,,,
-C27,score2_op,74,male,0,115,8.0,1.1,,,,
-C28,score2_op,74,female,0,165,6.5,1.9,,,,
-C29,score2_op,80,male,0,150,5.4,2.1,,,,
-C30,score2_op,70,female,1,155,3.6,1.1,,,,
+HS01,score2,40,male,0,120,4.5,1.5,01/1986,2026-10-10,1%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS02,score2,40,female,0,120,4.5,1.5,01/1986,2026-10-10,<1%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS03,score2,40,male,1,160,6.5,1.0,01/1986,2026-10-10,11%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS04,score2,40,female,1,160,6.5,1.0,01/1986,2026-10-10,8.8%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS05,score2,45,male,0,130,5.0,1.3,01/1981,2026-10-11,2.4%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS06,score2,45,female,0,130,5.0,1.3,01/1981,2026-10-11,1.5%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS07,score2,49,male,1,140,5.5,1.2,01/1977,2026-10-11,8.5%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS08,score2,49,female,1,140,5.5,1.2,01/1977,2026-10-11,7.3%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS09,score2,50,male,1,140,5.5,1.2,01/1976,2026-10-11,9%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS10,score2,50,female,1,140,5.5,1.2,01/1976,2026-10-11,7.7%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS11,score2,55,male,0,120,4.5,1.5,01/1971,2026-10-11,3.5%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS12,score2,55,female,0,120,4.5,1.5,01/1971,2026-10-11,2.6%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS13,score2,55,male,1,160,6.5,1.0,01/1971,2026-10-11,19%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS14,score2,55,female,1,160,6.5,1.0,01/1971,2026-10-11,17%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS15,score2,60,male,0,140,5.5,1.2,01/1966,2026-10-11,8.7%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS16,score2,60,female,0,140,5.5,1.2,01/1966,2026-10-11,7%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS17,score2,65,male,1,160,6.5,1.0,01/1961,2026-10-11,27%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS18,score2,65,female,1,160,6.5,1.0,01/1961,2026-10-11,26%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS19,score2,69,male,0,140,5.5,1.2,01/1957,2026-10-11,15%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS20,score2,69,female,0,140,5.5,1.2,01/1957,2026-10-11,14%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS21,score2_op,70,male,0,140,5.5,1.2,01/1956,2026-10-11,16%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS22,score2_op,70,female,0,140,5.5,1.2,01/1956,2026-10-11,15%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS23,score2_op,75,male,0,130,5.0,1.3,01/1951,2026-10-11,19%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS24,score2_op,75,female,0,130,5.0,1.3,01/1951,2026-10-11,19%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS25,score2_op,80,male,1,150,6.0,1.1,01/1946,2026-10-11,41%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS26,score2_op,80,female,1,150,6.0,1.1,01/1946,2026-10-11,45%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS27,score2_op,85,male,0,160,6.5,1.0,01/1941,2026-10-11,52%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS28,score2_op,85,female,0,160,6.5,1.0,01/1941,2026-10-11,51%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS29,score2_op,89,male,1,140,5.5,1.2,10/1937,2026-10-11,47%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk
+HS30,score2_op,89,female,1,140,5.5,1.2,10/1937,2026-10-11,58%,LMB_Claude_Data.docx v1.1; official HeartScore Europe high risk

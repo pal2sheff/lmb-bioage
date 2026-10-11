@@ -224,6 +224,28 @@ CAIDE_SOURCE = "Kivipelto M et al. Lancet Neurol 2006;5(9):735–741, табл. 
 CAIDE_ACTIVITY = ("active", "inactive")
 
 
+# Ступени возрастного балла CAIDE: <47 → 0, 47–53 → 3, >53 → 4 (оригинальная шкала, без сглаживания).
+CAIDE_AGE_STEPS = (47, 54)
+
+
+def caide_age_band(age: int) -> dict:
+    """Возрастная категория CAIDE для показа врачу."""
+    if age < 47:
+        return {"band": "<47", "label": "младше 47 лет", "points": 0}
+    if age <= 53:
+        return {"band": "47-53", "label": "47–53 года", "points": 3}
+    return {"band": ">53", "label": "старше 53 лет", "points": 4}
+
+
+def caide_step_crossings(age_a: int, age_b: int) -> list:
+    """Границы ступеней CAIDE (47, 54), пересечённые между двумя обследованиями.
+
+    Для сравнения визитов: изменение Brain при таком переходе отражает шкалу, а не здоровье.
+    """
+    lo, hi = sorted((age_a, age_b))
+    return [b for b in CAIDE_AGE_STEPS if lo < b <= hi]
+
+
 def caide_points(age: int, education_years: int, male: bool, sbp: float, bmi_value: float, tc: float,
                  active: bool) -> dict:
     """Баллы модели 1 по таблице владельца (LMB_Claude_Data_1, раздел 6). Сумма 0–15."""
@@ -276,7 +298,8 @@ def caide(enc: Encounter) -> IndexResult:
     bmi_value = w / (h / 100) ** 2
     pts = caide_points(age, edu, sex == Sex.MALE, sbp, bmi_value, tc, act == "active")
     return g.result(float(sum(pts.values())), "points",
-                    {"points": pts, "bmi": bmi_value, "model": "CAIDE model 1 (без APOE)", "source": CAIDE_SOURCE})
+                    {"points": pts, "bmi": bmi_value, "age_band": caide_age_band(age),
+                     "model": "CAIDE model 1 (без APOE)", "source": CAIDE_SOURCE})
 FRAX_AGE = (40, 90)
 FRAX_STATUS_FLAG = "frax_status"   # состояние получения результата, которое передаёт сервер
 

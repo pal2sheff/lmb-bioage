@@ -79,9 +79,20 @@ def verified(code):
 
 
 def test_not_activated_until_heartscore():
-    r = cardio.score2(enc(age=55, sex=Sex.MALE, flags=FLAGS, **GOOD))
+    """Без отметки сверки индекс не считается (правило активации)."""
+    p = copy.deepcopy(cardio.load_params("score2"))
+    p["verification"]["heartscore_verified"] = False
+    r = cardio.score2(enc(age=55, sex=Sex.MALE, flags=FLAGS, **GOOD), p)
     assert r.status == Status.MODEL_NOT_CONFIGURED and r.value is None
     assert "HeartScore" in r.reasons[0]
+
+
+def test_shipped_params_activated_after_heartscore():
+    """11.10.2026: сверены 20 случаев SCORE2 и 10 SCORE2-OP — оба алгоритма активированы."""
+    for code in ("score2", "score2_op"):
+        assert cardio.load_params(code)["verification"]["heartscore_verified"] is True
+    r = cardio.score2(enc(age=55, sex=Sex.MALE, flags=FLAGS, **GOOD))
+    assert r.status == Status.CALCULATED and r.unit == "%"
 
 
 def test_calculated_when_verified():

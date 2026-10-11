@@ -26,7 +26,7 @@
   "verification": {
     "constants_cross_checked": true,
     "constants_cross_check_note": "Значения совпадают в двух независимых открытых реализациях; дополнительные материалы ehab309 напрямую не загружены (архив недоступен инструментам)",
-    "heartscore_verified": false,
-    "heartscore_note": "Активация после сверки не менее 20 синтетических случаев с HeartScore (регион high), допуск ±0,1 п. п."
+    "heartscore_verified": true,
+    "heartscore_note": "Сверено 20 из 20 случаев HeartScore Europe high risk (HS01–HS20, tests/fixtures/heartscore_check.csv): HS01–HS04 — 10.10.2026, остальные — 11.10.2026; совпадение с отображаемой точностью HeartScore при непрерывном возрасте. Активировано по решению владельца 11.10.2026 (LMB_Claude_Decisions)"
   }
 }

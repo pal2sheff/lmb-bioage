@@ -17,13 +17,13 @@ const MISSING: Partial<Record<Status, string>> = {
   awaiting_review: "ждёт подтверждения",
 };
 // знак ставится только если число не округляется до нуля (иначе «−0»)
-const signed = (v: number, d = 2) => {
+export const signed = (v: number, d = 2) => {
   if (Math.abs(v) < 0.5 * 10 ** -d) return "0";
   return (v > 0 ? "+" : "−") + fmt(Math.abs(v), d);
 };
 const effect = (v: number) => (v > 0 ? "повышает" : v < 0 ? "снижает" : "не меняет");
 
-function Bar({ value, max }: { value: number; max: number }) {
+export function Bar({ value, max }: { value: number; max: number }) {
   const w = max > 0 ? (Math.abs(value) / max) * 50 : 0;
   return (
     <span className="dv-track" aria-hidden="true">
@@ -34,11 +34,12 @@ function Bar({ value, max }: { value: number; max: number }) {
 }
 
 /** Вклад веток модели v0.3: коэффициент × доменная оценка, в условных годах модели. */
-export function BranchContributions({ domains, catalog, intercept, total }: {
+export function BranchContributions({ domains, catalog, intercept, total, research = false }: {
   domains: DomainRes[];
   catalog: Catalog;
   intercept: number;
   total: boolean;
+  research?: boolean;
 }) {
   const title = Object.fromEntries(catalog.branches.map((b) => [b.code, b]));
   const dom = new Map(domains.map((d) => [d.domain, d]));
@@ -88,7 +89,9 @@ export function BranchContributions({ domains, catalog, intercept, total }: {
         Вклад = коэффициент модели v0.3 × доменная оценка, в условных годах модели. Постоянная модели {signed(intercept)}.{" "}
         {total
           ? "Сумма вкладов и постоянной равна разнице между расчётным и календарным возрастом."
-          : "Пока не рассчитаны все семь систем, вклады не суммируются в итог."}{" "}
+          : research
+            ? "Клинический итог не утверждён; сумма вкладов и постоянной равна отклонению исследовательского расчёта выше."
+            : "Клинический итог не рассчитан, вклады не суммируются."}{" "}
         {extra.length > 0 && <>{extra.join(" и ")} показываются в своих единицах и в модель v0.3 не входят.</>}
       </p>
     </section>
@@ -184,6 +187,7 @@ function TrajectoryChart({ code, t }: { code: string; t: Trajectory }) {
       <figcaption>
         <strong>{INDEX_LABEL[code] ?? code}</strong>
         {unit && <span className="muted small"> {unit}</span>}
+        {code === "score2" && <span className="traj-note">отклонение от авторского ожидания v0.3, не категория риска</span>}
         <span className={`traj-z ${tone}`}>
           Z {signed(t.z_raw, 1)} · {near ? "на уровне" : worse ? "неблагоприятнее" : "благоприятнее"} ожидаемого
         </span>

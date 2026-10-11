@@ -25,8 +25,11 @@ def upgrade():
     op.create_unique_constraint('uq_model_version_label_revision', 'model_version', ['label', 'revision'])
 
     import uuid
-    from lmb_engine.model import check_config, config_path, config_sha256, load_config
-    cfg = load_config(config_path("model_v0.3.json"))
+    from pathlib import Path
+    from lmb_engine.model import check_config, config_sha256, load_config
+    # Конфигурация редакции 2 заморожена снимком: последующие изменения файла движка
+    # оформляются новыми редакциями (0007 и далее) и не меняют уже выпущенную редакцию.
+    cfg = load_config(str(Path(__file__).resolve().parents[1] / "snapshots" / "model_v0.3_rev2.json"))
     chk = check_config(cfg)
     assert chk.valid, chk.errors
     op.execute("UPDATE model_version SET state = 'archived', source_note = 'Веса v0.3 без нормализации' "
