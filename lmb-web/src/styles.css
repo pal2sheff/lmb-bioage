@@ -458,3 +458,35 @@ details.more[open] > summary::before { transform: rotate(90deg); }
 .dev-head .dev-num { white-space: normal; }
 .tab-body .group-title { margin-top: 32px; }
 .tab-body .group-title:first-of-type { margin-top: 8px; }
+
+/* — результаты: возрастные показатели, ограничения, исследовательский раздел (аудит 11.10.2026) — */
+.age-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 16px; align-items: start; }
+.age-card { background: var(--card); border: 1px solid var(--rule); border-radius: var(--radius); padding: 24px 28px;
+  box-shadow: var(--shadow); }
+.age-card.research-card { border-top: 4px solid var(--burgundy); margin-bottom: 0; }
+.age-card-head { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: space-between; }
+.age-card-head h3 { font-size: 22px; }
+.age-card-sub { margin: 6px 0 14px; color: var(--ink-2); font-size: 14px; }
+.age-card-value { margin: 0 0 8px; display: flex; align-items: baseline; gap: 8px; }
+.figure-unit { font-size: 18px; color: var(--ink-2); font-weight: 600; }
+.age-card .research-toggle { margin: 0 0 16px; }
+.link-btn { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; font-weight: 600;
+  text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.link-btn:hover { color: var(--ink); }
+.gaps-card { margin-top: 24px; }
+.gaps-card .section-title { margin-top: 0; }
+.gaps-card h3 { font-size: 16px; margin: 16px 0 6px; color: var(--ink-2); }
+.gap-list { margin: 0; padding-left: 20px; line-height: 1.6; }
+.extra-branches { margin-top: 24px; }
+.extra-branches .branch-grid { margin-top: 16px; }
+.research-section { margin-top: 28px; border-top: 4px solid var(--burgundy); background: var(--card);
+  border-radius: var(--radius); padding: 20px 24px; border-left: 1px solid var(--rule); border-right: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule); }
+.research-section > summary { cursor: pointer; font-size: 20px; font-weight: 700; }
+.research-section .limits { margin-bottom: 16px; }
+.research-section .cardio-check { margin-top: 16px; padding: 20px 24px; border-top: 1px solid var(--rule); }
+.frax-pair { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; align-items: baseline; }
+.frax-pair .strong-note { grid-column: 1 / -1; margin-top: 4px; font-weight: 600; color: var(--ink-2); }
+.acr-source { display: block; margin-top: 4px; }
+.results-toolbar { margin-bottom: 8px; }
+@media (max-width: 900px) { .age-grid { grid-template-columns: 1fr; } }

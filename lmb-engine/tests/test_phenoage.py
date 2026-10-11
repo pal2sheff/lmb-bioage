@@ -1,4 +1,5 @@
-"""PhenoAge (Levine 2018; поправка PLoS Med 2019) — контрольный ориентир, в LMB v0.3 не входит.
+"""PhenoAge (Levine 2018; поправка PLoS Med 2019) — самостоятельный показатель; в LMB не входит и с ним
+не сравнивается.
 
 Константы ниже переписаны из публикаций независимо от файла параметров: тест ловит ошибку переноса.
 Эталонов официального калькулятора нет — reference_cases_verified = false.
@@ -37,8 +38,8 @@ def test_value_matches_published_formula():
     exp = published(45, 70, 5.0, 1.0, 2.0 / 6.0 * 100, 90, 13, 70, 6.0, 55)
     assert r.value == pytest.approx(exp, abs=1e-9)
     assert r.extra["lymphocyte_percent"] == pytest.approx(100 / 3)
-    assert r.extra["role"] == "control_reference"
-    assert any("не сверены" in w for w in r.warnings)
+    assert r.extra["role"] == "independent_age_indicator"
+    assert any("не сверен" in w for w in r.warnings)
 
 
 def test_units_crp_and_albumin_conversions():
@@ -66,7 +67,8 @@ def test_blocking_rules():
     assert phenoage(enc(age=55, **{k: v for k, v in LAB.items() if k != "crp"})).status == Status.MISSING_DATA
     below = phenoage(enc(age=55, **{**LAB, "crp": Measurement(0.2, "mg/L", Qualifier.LT)}))
     assert below.status == Status.INVALID_INPUT and below.value is None       # предел определения не подставляется
-    assert phenoage(enc(age=55, **{**LAB, "lymphocytes_abs": 7.0})).status == Status.INVALID_INPUT
+    bad = phenoage(enc(age=55, **{**LAB, "lymphocytes_abs": 7.0}))
+    assert bad.status == Status.INVALID_INPUT and set(bad.invalid_fields) == {"lymphocytes_abs", "wbc"}
     assert phenoage(enc(age=55, flags={"fasting_status": "no"}, **LAB)).status == Status.NOT_APPLICABLE
     assert phenoage(enc(age=55, units={"rdw": "fL"}, **LAB)).status == Status.INVALID_INPUT  # RDW-SD не подставляется
     assert phenoage(enc(age=55, flags={"acute_infection": "yes"}, **LAB)).status == Status.NOT_APPLICABLE

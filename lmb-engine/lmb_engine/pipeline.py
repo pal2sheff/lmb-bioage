@@ -12,6 +12,7 @@ from typing import Mapping, Optional
 from . import __version__
 from .cardio import model_for_age
 from .core import Encounter, Status, age_full_years, is_finite_number
+from .consistency import all_issues
 from .experiments import cardio_anchor
 from .indices import run_all
 from .model import (ALL_DOMAINS, UNIT_CONVERSIONS, IntegralResult, ZScore, _inverse, attribute, check_config,
@@ -138,4 +139,6 @@ def run(enc: Encounter, config: Mapping, external: Optional[Mapping[str, float]]
         "missing_fields": sorted({f for r in indices.values() for f in r.missing_fields} | set(check.gaps)),
         "blocking_reasons": integ.blocking_reasons,
         "research": research,
+        # межполевые противоречия входов (ОАК, FRAX) — интерфейс показывает их у полей
+        "input_checks": all_issues(enc),
     }

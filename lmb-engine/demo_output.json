@@ -2,7 +2,7 @@
   "input_version": "sha256:d116bd2ccbbe4ff9e017f7aa3972b14a864e2e3c9f9767b651e22c113a9906a6",
   "model_version": "v0.3",
   "model_config_sha256": "fe643c40f336a8c0704b63a8cd9b410a24d638b0de2e5de8c2ff3f0597d05db7",
-  "engine_version": "0.7.0",
+  "engine_version": "0.8.0",
   "status": "blocked",
   "age_years": 52,
   "indices": [
@@ -15,7 +15,8 @@
       "extra": {},
       "warnings": [],
       "missing_fields": [],
-      "reasons": []
+      "reasons": [],
+      "invalid_fields": []
     },
     {
       "code": "whtr",
@@ -26,7 +27,8 @@
       "extra": {},
       "warnings": [],
       "missing_fields": [],
-      "reasons": []
+      "reasons": [],
+      "invalid_fields": []
     },
     {
       "code": "asmi",
@@ -39,7 +41,8 @@
       "missing_fields": [
         "visbody_asm"
       ],
-      "reasons": []
+      "reasons": [],
+      "invalid_fields": []
     },
     {
       "code": "homa_ir",
@@ -50,7 +53,8 @@
       "extra": {},
       "warnings": [],
       "missing_fields": [],
-      "reasons": []
+      "reasons": [],
+      "invalid_fields": []
     },
     {
       "code": "tyg",
@@ -61,7 +65,8 @@
       "extra": {},
       "warnings": [],
       "missing_fields": [],
-      "reasons": []
+      "reasons": [],
+      "invalid_fields": []
     },
     {
       "code": "aip",
@@ -72,7 +77,8 @@
       "extra": {},
       "warnings": [],
       "missing_fields": [],
-      "reasons": []
+      "reasons": [],
+      "invalid_fields": []
     },
     {
       "code": "non_hdl",
@@ -83,7 +89,8 @@
       "extra": {},
       "warnings": [],
       "missing_fields": [],
-      "reasons": []
+      "reasons": [],
+      "invalid_fields": []
     },
     {
       "code": "egfr_ckdepi_cr_2021",
@@ -96,7 +103,8 @@
       },
       "warnings": [],
       "missing_fields": [],
-      "reasons": []
+      "reasons": [],
+      "invalid_fields": []
     },
     {
       "code": "acr",
@@ -105,11 +113,14 @@
       "value": 1.263157894736842,
       "unit": "mg/mmol",
       "extra": {
+        "acr_calculated_mg_mmol": 1.263157894736842,
+        "source": "calculated",
         "acr_mg_g": 11.166315789473684
       },
       "warnings": [],
       "missing_fields": [],
-      "reasons": []
+      "reasons": [],
+      "invalid_fields": []
     },
     {
       "code": "fib4",
@@ -120,7 +131,8 @@
       "extra": {},
       "warnings": [],
       "missing_fields": [],
-      "reasons": []
+      "reasons": [],
+      "invalid_fields": []
     },
     {
       "code": "nlr",
@@ -131,7 +143,8 @@
       "extra": {},
       "warnings": [],
       "missing_fields": [],
-      "reasons": []
+      "reasons": [],
+      "invalid_fields": []
     },
     {
       "code": "sii",
@@ -142,7 +155,8 @@
       "extra": {},
       "warnings": [],
       "missing_fields": [],
-      "reasons": []
+      "reasons": [],
+      "invalid_fields": []
     },
     {
       "code": "score2",
@@ -161,7 +175,8 @@
         "Хроническая болезнь почек: неизвестно",
         "Семейная гиперхолестеринемия: неизвестно",
         "Очень высокий отдельный фактор риска по оценке врача: неизвестно"
-      ]
+      ],
+      "invalid_fields": []
     },
     {
       "code": "score2_op",
@@ -181,7 +196,8 @@
         "Семейная гиперхолестеринемия: неизвестно",
         "Очень высокий отдельный фактор риска по оценке врача: неизвестно",
         "Возраст 52 вне диапазона SCORE2-OP (70–89 лет)"
-      ]
+      ],
+      "invalid_fields": []
     },
     {
       "code": "caide",
@@ -196,7 +212,8 @@
         "education_years",
         "physical_activity_caide"
       ],
-      "reasons": []
+      "reasons": [],
+      "invalid_fields": []
     },
     {
       "code": "frax_kz",
@@ -209,7 +226,8 @@
       "missing_fields": [
         "frax_result"
       ],
-      "reasons": []
+      "reasons": [],
+      "invalid_fields": []
     },
     {
       "code": "phenoage",
@@ -227,7 +245,8 @@
         "rdw",
         "alp"
       ],
-      "reasons": []
+      "reasons": [],
+      "invalid_fields": []
     }
   ],
   "zscores": {
@@ -2348,5 +2367,6 @@
         "SCORE2 не рассчитан: Установленное атеросклеротическое ССЗ: неизвестно; Хроническая болезнь почек: неизвестно; Семейная гиперхолестеринемия: неизвестно; Очень высокий отдельный фактор риска по оценке врача: неизвестно"
       ]
     }
-  }
+  },
+  "input_checks": []
 }

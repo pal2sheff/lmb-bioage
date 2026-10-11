@@ -47,6 +47,8 @@ export interface Definition {
   allowed_units: string[];
   plausible_min: number | null;
   plausible_max: number | null;
+  /** множитель перевода единицы в каноническую (из справочника движка) — для явного пересчёта при смене единицы */
+  unit_factors?: Record<string, number>;
 }
 
 export interface QItem {
@@ -93,6 +95,15 @@ export interface IndexRes {
   warnings: string[];
   missing_fields: string[];
   reasons: string[];
+  /** поля с ошибкой или противоречием (для перехода к полю) */
+  invalid_fields?: string[];
+}
+
+/** Межполевое противоречие входов (ОАК, FRAX). */
+export interface InputCheck {
+  code: string;
+  fields: string[];
+  message: string;
 }
 
 export interface ZRes {
@@ -187,6 +198,7 @@ export interface Run {
     trajectories?: Record<string, Trajectory>;
     research?: ResearchRes;
     age_years?: number | null;
+    input_checks?: InputCheck[];
     model_version?: string;
     model_config_sha256?: string;
     engine_version?: string;

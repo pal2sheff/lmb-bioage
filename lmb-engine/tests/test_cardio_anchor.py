@@ -31,18 +31,14 @@ def test_example1_v03_control_arithmetic(ex1):
     assert idx["score2"]["value"] == pytest.approx(3.22300, abs=TOL)
     assert math.expm1(ex1["zscores"]["score2"]["expected"]) == pytest.approx(0.70842, abs=TOL)
     assert r["bioage_years"] == pytest.approx(58.60469, abs=TOL)
-    assert idx["phenoage"]["value"] == pytest.approx(50.10730, abs=TOL)
-    assert r["bioage_years"] - idx["phenoage"]["value"] == pytest.approx(8.49739, abs=TOL)
+    assert idx["phenoage"]["value"] == pytest.approx(50.10730, abs=TOL)        # самостоятельный показатель
     assert r["contributions"]["cardio"] == pytest.approx(1.73483, abs=TOL)
     assert r["contributions"]["renal"] == pytest.approx(1.89879, abs=TOL)
     assert r["bioage_years"] - r["contributions"]["cardio"] == pytest.approx(56.86986, abs=TOL)
 
 
-def test_cardio_share_of_gap(ex1):
-    """Cardio объясняет около 20 % разницы LMB − PhenoAge; максимум вклада Cardio — 0,7 × 3 = 2,1 года."""
-    r, gap = ex1["research"], ex1["research"]["bioage_years"] - by_code(ex1)["phenoage"]["value"]
-    assert r["contributions"]["cardio"] / gap == pytest.approx(0.204, abs=0.001)
-    assert gap - r["contributions"]["cardio"] == pytest.approx(6.76256, abs=TOL)
+def test_cardio_contribution_ceiling():
+    """Максимальный вклад Cardio — 0,7 × 3 = 2,1 года. (Сравнение LMB с PhenoAge не ведётся — решение 11.10.2026.)"""
     assert CFG["integral"]["weights"]["cardio"] * CFG["integral"]["z_clip"] == pytest.approx(2.1)
 
 
@@ -59,7 +55,6 @@ def test_example1_experiment_control_arithmetic(ex1):
     assert x["z_clipped"] == pytest.approx(0.45596, abs=TOL)
     assert x["contribution"] == pytest.approx(0.31917, abs=TOL)
     assert x["bioage_years"] == pytest.approx(57.18903, abs=TOL)
-    assert x["bioage_years"] - by_code(ex1)["phenoage"]["value"] == pytest.approx(7.08174, abs=TOL)
     assert x["contribution_v03"] == pytest.approx(1.73483, abs=TOL)
     assert x["change_years"] == pytest.approx(x["contribution"] - x["contribution_v03"], abs=1e-12)
     assert x["label"] == "Проверочный расчёт с условным контрольным профилем"

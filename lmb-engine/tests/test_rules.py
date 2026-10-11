@@ -145,9 +145,9 @@ def test_egfr_idms():
     assert r.status == Status.CALCULATED and r.warnings
 
 
-def test_acr_lab_same_value_no_warning():
-    r = ix.acr(enc(u_albumin=20, u_creatinine=10, acr_lab=Measurement(2.0, "mg/mmol")))
-    assert not r.warnings and r.extra["acr_lab_vs_calc_diff_mg_mmol"] == 0
+def test_acr_lab_bad_unit_is_invalid():
+    r = ix.acr(enc(acr_lab=Measurement(2.0, "mg/L")))
+    assert r.status == Status.INVALID_INPUT and r.invalid_fields == ["acr_lab"]
 
 
 def test_fib4_minor():

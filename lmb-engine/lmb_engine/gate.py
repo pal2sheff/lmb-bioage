@@ -23,6 +23,7 @@ class Gate:
         self.review: list = []
         self.not_applicable: list = []
         self.warnings: list = []
+        self.invalid_fields: list = []
 
     # --- входные значения
     def value(self, key: str) -> Optional[float]:
@@ -37,23 +38,30 @@ class Gate:
             return None
         if m.qualifier != Qualifier.EQ:
             sign = "<" if m.qualifier == Qualifier.LT else ">"
-            self.invalid.append(f"{key}: значение «{sign}{m.value}» — правило для цензурированных значений не утверждено")
+            self.invalid_fields.append(key)
+            self.invalid.append(f"{d.name_ru}: значение «{sign}{m.value}» — правило для значений ниже/выше предела "
+                                f"определения не утверждено")
             return None
         if m.unit in d.rejected_units:
-            self.invalid.append(f"{key}: {d.rejected_units[m.unit]}")
+            self.invalid_fields.append(key)
+            self.invalid.append(f"{d.name_ru}: {d.rejected_units[m.unit]}")
             return None
         conv = d.conversions.get(m.unit)
         if conv is None:
-            self.invalid.append(f"{key}: единица «{m.unit}» не поддерживается (каноническая {d.canonical_unit})")
+            self.invalid_fields.append(key)
+            self.invalid.append(f"{d.name_ru}: единица «{m.unit}» не поддерживается")
             return None
         v = conv(float(m.value))
         if d.plausible is not None:
             lo, hi = d.plausible
             if not (lo <= v <= hi):
-                self.invalid.append(f"{key}: {v:g} {d.canonical_unit} вне технического диапазона {lo}–{hi}")
+                self.invalid_fields.append(key)
+                ru = lambda x: f"{round(x, 3):g}".replace(".", ",")  # noqa: E731
+                self.invalid.append(f"{d.name_ru}: {ru(v)} вне допустимого диапазона {ru(lo)}–{ru(hi)} — проверьте "
+                                    f"значение и единицу")
                 return None
         if m.review == Review.PENDING:
-            self.review.append(f"{key}: значение не подтверждено врачом")
+            self.review.append(f"{d.name_ru}: значение не подтверждено врачом")
         return v
 
     def age(self) -> Optional[int]:
@@ -62,7 +70,7 @@ class Gate:
             return None
         a = age_full_years(self.enc.birth_date, self.enc.encounter_date)
         if a < 0:
-            self.invalid.append("birth_date позже даты обследования")
+            self.invalid.append("Дата рождения позже даты обследования")
             return None
         return a
 
@@ -70,6 +78,12 @@ class Gate:
         if self.enc.sex is None:
             self.missing.append("sex_at_birth")
         return self.enc.sex
+
+    def consistent(self, issue: Optional[dict]) -> None:
+        """Межполевая проверка (consistency.py): противоречие делает индекс invalid_input."""
+        if issue:
+            self.invalid.append(issue["message"])
+            self.invalid_fields.extend(issue["fields"])
 
     def same_sample(self, *keys: str, label: str = "") -> None:
         """Показатели должны быть из одного образца/даты; иначе — проверка врачом."""
@@ -121,5 +135,6 @@ class Gate:
         return IndexResult(
             code=self.code, version=self.version, status=status, value=value, unit=unit,
             extra=extra or {}, warnings=list(self.warnings), missing_fields=list(self.missing),
+            invalid_fields=list(dict.fromkeys(self.invalid_fields)),
             reasons=self.invalid + self.review + self.not_applicable,
         )

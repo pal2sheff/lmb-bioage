@@ -85,6 +85,7 @@ class IndexResult:
     warnings: list = field(default_factory=list)
     missing_fields: list = field(default_factory=list)
     reasons: list = field(default_factory=list)
+    invalid_fields: list = field(default_factory=list)   # поля с ошибкой или противоречием — для ссылки к полю
 
     @property
     def key(self) -> str:
@@ -95,7 +96,7 @@ class IndexResult:
             "code": self.code, "version": self.version, "status": self.status.value,
             "value": self.value, "unit": self.unit, "extra": self.extra,
             "warnings": self.warnings, "missing_fields": self.missing_fields,
-            "reasons": self.reasons,
+            "reasons": self.reasons, "invalid_fields": self.invalid_fields,
         }
 
 
