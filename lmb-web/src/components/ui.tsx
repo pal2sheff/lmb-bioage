@@ -3,7 +3,7 @@ import type { Status } from "../types";
 
 // Цвет всегда дублируется знаком и текстом (ТЗ 11.3).
 const STATUS: Record<Status, { label: string; mark: string; tone: string }> = {
-  calculated: { label: "Рассчитано", mark: "●", tone: "ok" },
+  calculated: { label: "Рассчитано", mark: "●", tone: "neutral" },   // нейтрально: не означает благоприятный результат
   missing_data: { label: "Не хватает данных", mark: "○", tone: "muted" },
   invalid_input: { label: "Ошибка ввода", mark: "✕", tone: "error" },
   not_applicable: { label: "Неприменимо", mark: "⊘", tone: "na" },
@@ -11,7 +11,7 @@ const STATUS: Record<Status, { label: string; mark: string; tone: string }> = {
   integration_not_configured: { label: "Интеграция не подключена", mark: "◇", tone: "na" },
   external_error: { label: "Ошибка внешнего сервиса", mark: "!", tone: "error" },
   awaiting_review: { label: "Требуется подтверждение", mark: "◐", tone: "review" },
-  not_included: { label: "Не включено в версию", mark: "–", tone: "na" },
+  not_included: { label: "Не входит в модель", mark: "–", tone: "na" },
 };
 
 export function StatusBadge({ status }: { status: Status }) {

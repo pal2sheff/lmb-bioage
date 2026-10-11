@@ -46,11 +46,7 @@ export function Profile({ encounterId }: { encounterId: string }) {
       <div className="toolbar">
         <div>
           {run ? (
-            <p className="muted small">
-              Расчёт от {dateRu(run.created_at)} · модель {run.model_version}
-              {run.model_revision ? `, ред. ${run.model_revision}` : ""} · модуль {run.engine_version} · входы{" "}
-              <span className="mono">{run.result.input_version.slice(7, 19)}</span>
-            </p>
+            <p className="muted small">Расчёт от {dateRu(run.created_at)}</p>
           ) : (
             <p className="muted small">Расчёт ещё не выполнялся.</p>
           )}
@@ -64,7 +60,14 @@ export function Profile({ encounterId }: { encounterId: string }) {
       </div>
       <Alert>{err}</Alert>
       <Alert kind="info">{repro}</Alert>
-      {run && <ProfileView result={{ ...run.result, status: run.status, bioage_years: run.bioage_years, delta_years: run.delta_years }} catalog={catalog} />}
+      {run && (
+        <ProfileView
+          result={{ ...run.result, status: run.status, bioage_years: run.bioage_years, delta_years: run.delta_years,
+            model_version: run.model_version, model_config_sha256: run.model_config_sha256, engine_version: run.engine_version }}
+          catalog={catalog}
+          meta={<p className="small muted">Редакция модели {run.model_revision ?? "—"} · расчёт {run.calculation_id}</p>}
+        />
+      )}
     </div>
   );
 }

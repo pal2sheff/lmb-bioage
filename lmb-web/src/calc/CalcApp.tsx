@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { fmt, parseNumber } from "../api";
+import { parseNumber } from "../api";
 import { ProfileView, type EngineResult } from "../components/ProfileView";
-import { Alert, Button } from "../components/ui";
+import { Report } from "../components/Report";
+import { Alert, Button, ageOn, dateRu } from "../components/ui";
 import type { Catalog, QItem } from "../types";
 import { unitRu } from "../units";
 import { EXAMPLE, EXAMPLE_YOUNGER } from "./example";
@@ -67,6 +68,14 @@ export function toCase(f: FormState, catalog: Catalog): { kase: CalcCase; proble
   };
 }
 
+type Section = "data" | "questionnaire" | "profile" | "report";
+const SECTIONS: [Section, string][] = [
+  ["data", "Данные обследования"],
+  ["questionnaire", "Анкета"],
+  ["profile", "Профиль систем"],
+  ["report", "Отчёт"],
+];
+
 export function CalcApp() {
   const [engine, setEngine] = useState<Engine | null>(null);
   const [stage, setStage] = useState("Подготовка…");
@@ -75,6 +84,7 @@ export function CalcApp() {
   const [result, setResult] = useState<EngineResult | null>(null);
   const [problems, setProblems] = useState<string[]>([]);
   const [msg, setMsg] = useState("");
+  const [section, setSection] = useState<Section>("data");
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -102,6 +112,10 @@ export function CalcApp() {
     }, 200);
     return () => clearTimeout(t);
   }, [engine, form]);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [section]);
 
   function setValue(code: string, text: string, unit: string) {
     setForm((f) => ({ ...f, values: { ...f.values, [code]: { text, unit } } }));
@@ -134,12 +148,28 @@ export function CalcApp() {
     }
   }
 
+  const age = form.birth_date && form.encounter_date ? ageOn(form.birth_date, form.encounter_date) : null;
+  const facts = [
+    { label: "Возраст", value: age !== null && age >= 0 ? `${age} лет` : "—" },
+    { label: "Пол", value: form.sex ? (form.sex === "female" ? "Женский" : "Мужской") : "—" },
+    { label: "Обследование", value: form.encounter_date ? dateRu(form.encounter_date) : "—" },
+  ];
+  const qCount = engine ? engine.catalog.questionnaire_groups.flatMap((g) => g.items).filter((i) => i.kind !== "frax_list") : [];
+  const qDone = qCount.filter((i) => form.flags[i.code] && form.flags[i.code] !== "unknown").length;
+
   return (
     <div className="app">
       <header className="topbar">
         <span className="wordmark">
           LMB <em>BioAge</em>
         </span>
+        <div className="topbar-facts" aria-label="Пациент">
+          {facts.map((f) => (
+            <span key={f.label} className="fact-chip">
+              <span className="muted">{f.label}</span> <b className="num">{f.value}</b>
+            </span>
+          ))}
+        </div>
         {!engine && !loadErr && <span className="topbar-user muted small">{stage}</span>}
       </header>
       <main className="calc-main">
@@ -149,127 +179,141 @@ export function CalcApp() {
             с диска.
           </Alert>
         )}
-        <div className="calc-layout">
-          <section className="calc-form" aria-label="Данные пациента">
-            <div className="calc-actions row">
-              <Button small onClick={() => setForm(EXAMPLE)}>
-                Пример 1: старше паспортного
-              </Button>
-              <Button small onClick={() => setForm(EXAMPLE_YOUNGER)}>
-                Пример 2: моложе паспортного
-              </Button>
-              <Button small onClick={() => setForm({ ...EMPTY, encounter_date: today() })}>
-                Очистить
-              </Button>
-              <Button small onClick={save}>
-                Сохранить в файл
-              </Button>
-              <Button small onClick={() => fileRef.current?.click()}>
-                Открыть файл
-              </Button>
-              <a className="btn btn-sm to-result" href="#profile">
-                К профилю ↓
-              </a>
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".json,application/json"
-                hidden
+        <nav className="tabs" role="tablist" aria-label="Разделы">
+          {SECTIONS.map(([key, label]) => (
+            <button key={key} type="button" role="tab" aria-selected={section === key}
+              className={section === key ? "tab active" : "tab"} onClick={() => setSection(key)}>
+              {label}
+              {key === "data" && problems.length > 0 && <span className="tab-count" aria-label={`ошибок: ${problems.length}`}>{problems.length}</span>}
+              {key === "questionnaire" && engine && <span className="muted small num">{qDone}/{qCount.length}</span>}
+            </button>
+          ))}
+        </nav>
+
+        {!engine && !loadErr && <p className="loading">{stage}</p>}
+
+        {engine && section === "data" && (
+          <section aria-label="Данные обследования">
+            <div className="toolbar calc-toolbar">
+              <div className="row">
+                <Button onClick={() => setForm(EXAMPLE)}>Пример 1: старше паспортного</Button>
+                <Button onClick={() => setForm(EXAMPLE_YOUNGER)}>Пример 2: моложе паспортного</Button>
+                <Button onClick={() => setForm({ ...EMPTY, encounter_date: today() })}>Очистить</Button>
+              </div>
+              <div className="row">
+                <Button onClick={() => fileRef.current?.click()}>Открыть файл</Button>
+                <Button kind="primary" onClick={save}>Сохранить в файл</Button>
+              </div>
+              <input ref={fileRef} type="file" accept=".json,application/json" hidden
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (f) void open(f);
                   e.target.value = "";
-                }}
-              />
+                }} />
             </div>
             <p className="muted small">
-              Данные остаются в этом браузере и никуда не отправляются. После закрытия вкладки они исчезают — чтобы
-              вернуться к случаю, сохраните его в файл.
+              Данные остаются в этом браузере и никуда не отправляются; при переключении разделов они сохраняются. После
+              закрытия вкладки данные исчезают — чтобы вернуться к случаю, сохраните его в файл.
             </p>
             <Alert kind="info">{msg}</Alert>
-            {engine ? <Inputs catalog={engine.catalog} form={form} setForm={setForm} setValue={setValue} setFlag={setFlag} /> : null}
+            <Problems problems={problems} />
+            <DataInputs catalog={engine.catalog} form={form} setForm={setForm} setValue={setValue} />
+            <div className="next-row">
+              <Button kind="primary" onClick={() => setSection("questionnaire")}>Далее: анкета</Button>
+            </div>
           </section>
+        )}
 
-          <section className="calc-result" id="profile" aria-label="Результат">
-            {!engine && !loadErr && <p className="loading">{stage}</p>}
-            {engine && !result && (
-              <div className="panel">
-                <h3>Профиль появится здесь</h3>
-                <p className="muted">
-                  Укажите дату рождения, дату обследования и пол, затем вносите показатели — расчёт обновляется
-                  сразу. Для знакомства откройте один из синтетических примеров.
-                </p>
-              </div>
-            )}
-            {problems.length > 0 && (
-              <Alert kind="warn">
-                <strong>Проверьте ввод:</strong>
-                <ul>
-                  {problems.map((p) => (
-                    <li key={p}>{p}</li>
-                  ))}
-                </ul>
-              </Alert>
-            )}
-            {engine && result && (
-              <>
-                <div className="toolbar no-print">
-                  <span />
-                  <Button small onClick={() => window.print()}>
-                    Печать
-                  </Button>
-                </div>
-                <ProfileView result={result} catalog={engine.catalog} />
-              </>
-            )}
+        {engine && section === "questionnaire" && (
+          <section aria-label="Анкета">
+            <p className="muted small">«Не знаю» не считается ответом «нет». Пункты с отметкой «врач» подтверждает врач.</p>
+            <Questionnaire catalog={engine.catalog} form={form} setFlag={setFlag} />
+            <div className="next-row">
+              <Button kind="primary" onClick={() => setSection("profile")}>Далее: профиль систем</Button>
+            </div>
           </section>
-        </div>
+        )}
+
+        {engine && section === "profile" && (
+          <section id="profile" aria-label="Профиль систем">
+            <Problems problems={problems} />
+            {result ? <ProfileView result={result} catalog={engine.catalog} /> : <Empty go={() => setSection("data")} />}
+          </section>
+        )}
+
+        {engine && section === "report" && (
+          <section aria-label="Отчёт">
+            <Problems problems={problems} />
+            {result ? <Report result={result} catalog={engine.catalog} facts={facts} /> : <Empty go={() => setSection("data")} />}
+          </section>
+        )}
       </main>
     </div>
   );
 }
 
-function Inputs(props: {
+function Problems({ problems }: { problems: string[] }) {
+  if (problems.length === 0) return null;
+  return (
+    <Alert kind="warn">
+      <strong>Проверьте ввод:</strong>
+      <ul>
+        {problems.map((p) => (
+          <li key={p}>{p}</li>
+        ))}
+      </ul>
+    </Alert>
+  );
+}
+
+function Empty({ go }: { go: () => void }) {
+  return (
+    <div className="panel">
+      <h3>Профиль появится здесь</h3>
+      <p className="muted">
+        Укажите дату рождения, дату обследования и пол, затем вносите показатели — расчёт обновляется сразу. Для
+        знакомства откройте один из синтетических примеров.
+      </p>
+      <Button kind="primary" onClick={go}>Перейти к данным обследования</Button>
+    </div>
+  );
+}
+
+function DataInputs(props: {
   catalog: Catalog;
   form: FormState;
   setForm: React.Dispatch<React.SetStateAction<FormState>>;
   setValue: (code: string, text: string, unit: string) => void;
-  setFlag: (code: string, v: string) => void;
 }) {
-  const { catalog, form, setForm, setValue, setFlag } = props;
-  const qgroups = useMemo(
-    () =>
-      catalog.questionnaire_groups
-        .map((g) => ({ ...g, items: g.items.filter((i) => i.kind !== "frax_list") }))
-        .filter((g) => g.items.length > 0),
-    [catalog],
-  );
+  const { catalog, form, setForm, setValue } = props;
   return (
-    <>
-      <h3 className="group-title">Пациент и обследование</h3>
-      <div className="calc-row">
-        <label htmlFor="c-birth">Дата рождения</label>
-        <input id="c-birth" type="date" value={form.birth_date} onChange={(e) => setForm((f) => ({ ...f, birth_date: e.target.value }))} />
-      </div>
-      <div className="calc-row">
-        <label htmlFor="c-enc">Дата обследования</label>
-        <input id="c-enc" type="date" value={form.encounter_date} onChange={(e) => setForm((f) => ({ ...f, encounter_date: e.target.value }))} />
-      </div>
-      <div className="calc-row">
-        <span id="c-sex">Пол (для алгоритмов)</span>
-        <Segmented
-          label="Пол (для алгоритмов)"
-          value={form.sex}
-          options={[
-            ["female", "Женский"],
-            ["male", "Мужской"],
-          ]}
-          onChange={(v) => setForm((f) => ({ ...f, sex: v as FormState["sex"] }))}
-        />
-      </div>
+    <div className="input-grid">
+      <section className="card input-card">
+        <h3 className="group-title">Пациент и обследование</h3>
+        <div className="calc-row">
+          <label htmlFor="c-birth">Дата рождения</label>
+          <input id="c-birth" type="date" value={form.birth_date} onChange={(e) => setForm((f) => ({ ...f, birth_date: e.target.value }))} />
+        </div>
+        <div className="calc-row">
+          <label htmlFor="c-enc">Дата обследования</label>
+          <input id="c-enc" type="date" value={form.encounter_date} onChange={(e) => setForm((f) => ({ ...f, encounter_date: e.target.value }))} />
+        </div>
+        <div className="calc-row">
+          <span id="c-sex">Пол (для алгоритмов)</span>
+          <Segmented
+            label="Пол (для алгоритмов)"
+            value={form.sex}
+            options={[
+              ["female", "Женский"],
+              ["male", "Мужской"],
+            ]}
+            onChange={(v) => setForm((f) => ({ ...f, sex: v as FormState["sex"] }))}
+          />
+        </div>
+      </section>
 
       {catalog.observation_groups.map((g) => (
-        <div key={g.title}>
+        <section key={g.title} className="card input-card">
           <h3 className="group-title">{g.title}</h3>
           {g.items.map((d) => {
             const cur = form.values[d.code];
@@ -299,56 +343,68 @@ function Inputs(props: {
                     <span className="unit">{unitRu(unit)}</span>
                   )}
                 </span>
+                {bad && <span className="field-error">не число — используйте цифры и запятую</span>}
               </div>
             );
           })}
-        </div>
+        </section>
       ))}
 
+      <section className="card input-card">
+        <h3 className="group-title">FRAX — официальный результат (модель Казахстана)</h3>
+        <p className="muted small">
+          Перенесите оба 10-летних риска из официального калькулятора FRAX. Формула FRAX здесь не воспроизводится.
+        </p>
+        <div className="calc-row">
+          <label htmlFor="f-major">Основные остеопоротические переломы</label>
+          <span className="calc-val">
+            <input id="f-major" inputMode="decimal" value={form.frax.major} onChange={(e) => setForm((f) => ({ ...f, frax: { ...f.frax, major: e.target.value } }))} />
+            <span className="unit">%</span>
+          </span>
+        </div>
+        <div className="calc-row">
+          <label htmlFor="f-hip">Перелом бедра</label>
+          <span className="calc-val">
+            <input id="f-hip" inputMode="decimal" value={form.frax.hip} onChange={(e) => setForm((f) => ({ ...f, frax: { ...f.frax, hip: e.target.value } }))} />
+            <span className="unit">%</span>
+          </span>
+        </div>
+        <div className="calc-row">
+          <span>Расчёт FRAX</span>
+          <Segmented
+            label="Расчёт FRAX с МПК"
+            value={form.frax.with_bmd}
+            options={[
+              ["no", "без МПК"],
+              ["yes", "с МПК"],
+            ]}
+            onChange={(v) => setForm((f) => ({ ...f, frax: { ...f.frax, with_bmd: v as FormState["frax"]["with_bmd"] } }))}
+          />
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function Questionnaire({ catalog, form, setFlag }: { catalog: Catalog; form: FormState; setFlag: (code: string, v: string) => void }) {
+  const qgroups = useMemo(
+    () =>
+      catalog.questionnaire_groups
+        .map((g) => ({ ...g, items: g.items.filter((i) => i.kind !== "frax_list") }))
+        .filter((g) => g.items.length > 0),
+    [catalog],
+  );
+  return (
+    <div className="input-grid">
       {qgroups.map((g) => (
-        <div key={g.title}>
+        <section key={g.title} className="card input-card">
           <h3 className="group-title">{g.title}</h3>
           {g.items.map((it) => (
             <QRow key={it.code} it={it} value={form.flags[it.code] ?? ""} onChange={(v) => setFlag(it.code, v)} />
           ))}
-        </div>
+        </section>
       ))}
-
-      <h3 className="group-title">FRAX — официальный результат (модель Казахстана)</h3>
-      <p className="muted small">
-        Перенесите оба 10-летних риска из официального калькулятора FRAX. Формула FRAX здесь не воспроизводится.
-      </p>
-      <div className="calc-row">
-        <label htmlFor="f-major">Основные остеопоротические переломы</label>
-        <span className="calc-val">
-          <input id="f-major" inputMode="decimal" value={form.frax.major} onChange={(e) => setForm((f) => ({ ...f, frax: { ...f.frax, major: e.target.value } }))} />
-          <span className="unit">%</span>
-        </span>
-      </div>
-      <div className="calc-row">
-        <label htmlFor="f-hip">Перелом бедра</label>
-        <span className="calc-val">
-          <input id="f-hip" inputMode="decimal" value={form.frax.hip} onChange={(e) => setForm((f) => ({ ...f, frax: { ...f.frax, hip: e.target.value } }))} />
-          <span className="unit">%</span>
-        </span>
-      </div>
-      <div className="calc-row">
-        <span>Расчёт FRAX</span>
-        <Segmented
-          label="Расчёт FRAX с МПК"
-          value={form.frax.with_bmd}
-          options={[
-            ["no", "без МПК"],
-            ["yes", "с МПК"],
-          ]}
-          onChange={(v) => setForm((f) => ({ ...f, frax: { ...f.frax, with_bmd: v as FormState["frax"]["with_bmd"] } }))}
-        />
-      </div>
-      <p className="muted small calc-foot">
-        Справочно: {fmt(catalog.observation_groups.reduce((n, g) => n + g.items.length, 0), 0)} показателей,{" "}
-        {fmt(qgroups.reduce((n, g) => n + g.items.length, 0), 0)} пунктов анкеты. «Не знаю» не считается ответом «нет».
-      </p>
-    </>
+    </div>
   );
 }
 

@@ -1,15 +1,15 @@
-// Режим тестирования (решение владельца 11.10.2026): показывает контрольный PhenoAge рядом с
-// биологическим возрастом LMB. Состояние запоминается в этом браузере (удобство, не настройка модели).
+// Переключатель исследовательского расчёта (решение владельца 11.10.2026): явный, по умолчанию включён.
+// Состояние запоминается в этом браузере — удобство врача, не настройка модели.
 import { useState } from "react";
 
-const KEY = "lmb.testMode";
+const KEY = "lmb.researchMode";
 
-export function useTestMode(): [boolean, (v: boolean) => void] {
+export function useResearchMode(): [boolean, (v: boolean) => void] {
   const [on, setOn] = useState<boolean>(() => {
     try {
-      return window.localStorage.getItem(KEY) === "1";
+      return window.localStorage.getItem(KEY) !== "0";
     } catch {
-      return false;
+      return true;
     }
   });
   const set = (v: boolean) => {
@@ -23,13 +23,15 @@ export function useTestMode(): [boolean, (v: boolean) => void] {
   return [on, set];
 }
 
-export function TestModeToggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+export function ResearchToggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
   return (
     <label className="research-toggle no-print">
-      <input type="checkbox" role="switch" checked={on} onChange={(e) => onChange(e.target.checked)} />
-      <span>
-        Режим тестирования <span className="muted small">— контрольный PhenoAge для сверки расчёта</span>
+      <span className="switch">
+        <input type="checkbox" role="switch" checked={on} onChange={(e) => onChange(e.target.checked)}
+          aria-label="Исследовательский расчёт" />
+        <span />
       </span>
+      Исследовательский расчёт и контроль PhenoAge
     </label>
   );
 }

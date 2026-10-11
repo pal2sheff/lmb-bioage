@@ -52,15 +52,16 @@ export function BranchContributions({ domains, catalog, intercept, total }: {
       <header className="dv-head">
         <h3 id="dv-branches">Вклад систем организма</h3>
         <p className="dv-legend">
-          <span className="dv-key up" /> повышает расчётную оценку <span className="dv-key down" /> снижает
+          <span><span className="dv-key up" />+ повышает расчётную оценку</span>
+          <span><span className="dv-key down" />− снижает расчётную оценку</span>
         </p>
       </header>
       <div className="dv-rows" role="table" aria-label="Вклад веток в расчётную оценку">
         {done.map((d) => (
           <div key={d.domain} className="dv-row" role="row" title={`${title[d.domain]?.title}: доменная оценка ${fmt(d.score, 2)} × коэффициент ${fmt(d.coefficient, 1)} = ${signed(d.contribution!)}`}>
             <span className="dv-label" role="cell">
-              <strong>{title[d.domain]?.title}</strong>
-              <span className="muted small">{title[d.domain]?.name}</span>
+              <strong>{title[d.domain]?.name}</strong>
+              <span className="muted small">{title[d.domain]?.title}</span>
             </span>
             <Bar value={d.contribution!} max={max} />
             <span className="dv-val num" role="cell">
@@ -72,8 +73,8 @@ export function BranchContributions({ domains, catalog, intercept, total }: {
         {miss.map((d) => (
           <div key={d.domain} className="dv-row is-missing" role="row">
             <span className="dv-label" role="cell">
-              <strong>{title[d.domain]?.title}</strong>
-              <span className="muted small">{title[d.domain]?.name}</span>
+              <strong>{title[d.domain]?.name}</strong>
+              <span className="muted small">{title[d.domain]?.title}</span>
             </span>
             <span className="dv-track dv-empty" aria-hidden="true">
               <span className="dv-axis" />
@@ -97,7 +98,7 @@ export function BranchContributions({ domains, catalog, intercept, total }: {
 
 /** Показатели, за счёт которых расчётная оценка растёт или снижается (разложение вкладов веток). */
 export function IndicatorDrivers({ domains, catalog }: { domains: DomainRes[]; catalog: Catalog }) {
-  const title = Object.fromEntries(catalog.branches.map((b) => [b.code, b.title]));
+  const title = Object.fromEntries(catalog.branches.map((b) => [b.code, b.name]));
   const items = domains.flatMap((d) =>
     Object.entries(d.input_contributions ?? {}).map(([code, v]) => ({ code, v, branch: d.domain })),
   );
@@ -109,7 +110,8 @@ export function IndicatorDrivers({ domains, catalog }: { domains: DomainRes[]; c
       <header className="dv-head">
         <h3 id="dv-drivers">Какие показатели определяют оценку</h3>
         <p className="dv-legend">
-          <span className="dv-key up" /> повышает <span className="dv-key down" /> снижает
+          <span><span className="dv-key up" />+ повышает</span>
+          <span><span className="dv-key down" />− снижает</span>
         </p>
       </header>
       <div className="dv-rows compact" role="table" aria-label="Вклад показателей">
@@ -120,13 +122,16 @@ export function IndicatorDrivers({ domains, catalog }: { domains: DomainRes[]; c
               <span className="muted small">{title[i.branch]}</span>
             </span>
             <Bar value={i.v} max={max} />
-            <span className="dv-val num" role="cell">{signed(i.v)}</span>
+            <span className="dv-val num" role="cell">
+              {signed(i.v)}
+              <span className="muted small"> {effect(i.v)}</span>
+            </span>
           </div>
         ))}
       </div>
       <p className="dv-note small muted">
-        Вклад ветки разложен по её показателям в соответствии с правилом объединения: при среднем — каждый показатель даёт
-        свою долю (Z / число показателей × коэффициент ветки).
+        Вклад системы разложен по её показателям в соответствии с правилом объединения: при среднем — каждый показатель даёт
+        свою долю (Z / число показателей × коэффициент системы).
       </p>
     </section>
   );
@@ -137,15 +142,16 @@ const SYSTEM_OF: Record<string, string> = {
   acr: "renal", fib4: "hepatic", nlr: "inflammation", sii: "inflammation", caide: "brain", frax_major: "bone",
 };
 const SYSTEM_RU: Record<string, string> = {
-  cardio: "Cardio", metabolic: "Metabolic", renal: "Renal", hepatic: "Hepatic", inflammation: "Inflammation",
-  brain: "Brain", bone: "Bone",
+  cardio: "Сердце и сосуды", metabolic: "Обмен веществ", renal: "Почки", hepatic: "Печень", inflammation: "Воспаление",
+  brain: "Мозг (риск)", bone: "Кости (риск)",
 };
 const digitsFor = (v: number) => (Math.abs(v) >= 100 ? 0 : Math.abs(v) >= 10 ? 1 : 2);
+const toneOf = (z: number) => (Math.abs(z) < 0.05 ? "mid" : z > 0 ? "up" : "down");
+const dirText = (z: number) => (Math.abs(z) < 0.05 ? "на уровне ожидаемого" : z > 0 ? "неблагоприятнее" : "благоприятнее");
 
 /**
- * Одна диаграмма для всех показателей: общая безразмерная ось Z (отклонение от ожидаемого для возраста
- * и пола) и в каждой строке — траектория ожидаемого значения по возрасту в исходных единицах показателя.
- * Значения разных единиц на одну числовую ось не кладутся; общая ось — только Z.
+ * Сводная диаграмма: все показатели на общей безразмерной оси Z (отклонение от ожидаемого для возраста
+ * и пола). Значения разных единиц на одну числовую ось не кладутся; общая ось — только Z.
  */
 export function DeviationChart({ data }: { data: Record<string, Trajectory> }) {
   const codes = Object.keys(SYSTEM_OF).filter((c) => c in data);
@@ -155,17 +161,17 @@ export function DeviationChart({ data }: { data: Record<string, Trajectory> }) {
   return (
     <section className="dv-card traj-section" aria-labelledby="dv-traj">
       <header className="dv-head">
-        <h3 id="dv-traj">Показатели на траектории возраста</h3>
+        <h3 id="dv-traj">Показатели относительно ожидаемого для возраста и пола</h3>
         <p className="dv-legend">
-          <span className="dv-key line" /> ожидаемое для возраста и пола <span className="dv-key band" /> ±1 стандартное
-          отклонение <span className="dv-key up" /> неблагоприятнее <span className="dv-key down" /> благоприятнее
+          <span><span className="dv-key band" />±1 стандартное отклонение</span>
+          <span><span className="dv-key up" />+ неблагоприятнее</span>
+          <span><span className="dv-key down" />− благоприятнее</span>
         </p>
       </header>
       <div className="dev-grid" role="table" aria-label="Отклонение показателей от ожидаемого">
         <div className="dev-row dev-head" role="row">
           <span role="columnheader">Показатель</span>
-          <span role="columnheader">Траектория с возрастом</span>
-          <span role="columnheader" className="dev-axis-head">
+          <span role="columnheader" className="dev-axis-head" aria-label="Ось Z от −3 до +3">
             <span style={{ left: "0%" }}>−3</span>
             <span style={{ left: "33.333%" }}>−1</span>
             <span style={{ left: "50%" }}>0</span>
@@ -177,7 +183,7 @@ export function DeviationChart({ data }: { data: Record<string, Trajectory> }) {
         {codes.map((c, i) => {
           const t = data[c];
           const at = t.curve.find((p) => p.age === t.age);
-          const tone = Math.abs(t.z_raw) < 0.05 ? "mid" : t.z_raw > 0 ? "up" : "down";
+          const tone = toneOf(t.z_raw);
           const d = digitsFor(t.value);
           const unit = unitRu(t.unit);
           const newGroup = i === 0 || SYSTEM_OF[codes[i - 1]] !== SYSTEM_OF[c];
@@ -188,8 +194,7 @@ export function DeviationChart({ data }: { data: Record<string, Trajectory> }) {
                 <strong>{INDEX_LABEL[c] ?? c}</strong>
                 <span className="muted small">{SYSTEM_RU[SYSTEM_OF[c]]}{c === "score2" ? " · от авторского ожидания" : ""}</span>
               </span>
-              <span role="cell"><Spark t={t} tone={tone} /></span>
-              <span className="dev-strip" role="cell" aria-label={`Z ${signed(t.z_raw, 2)}`}>
+              <span className="dev-strip" role="cell" aria-label={`Z ${signed(t.z_raw, 2)}, ${dirText(t.z_raw)}`}>
                 <span className="dev-band" />
                 <span className="dev-zero" />
                 <span className={`dev-stem ${tone}`} style={t.z_raw >= 0
@@ -200,39 +205,83 @@ export function DeviationChart({ data }: { data: Record<string, Trajectory> }) {
               <span className="dev-num num" role="cell">
                 {fmt(t.value, d)} <span className="muted">/ {at ? fmt(at.expected, d) : "—"}</span>
                 {unit && <span className="muted small"> {unit}</span>}
+                <span className="dev-dir">
+                  Z {signed(t.z_raw, 1)} · {dirText(t.z_raw)}
+                </span>
               </span>
             </div>
           );
         })}
       </div>
-      <p className="dv-note small muted">
-        Ожидаемое значение — нормализация модели LMB (авторская конфигурация, не клинические нормы). Z — отклонение от
-        ожидаемого в стандартных отклонениях: вправо — неблагоприятнее, влево — благоприятнее; в модель входит Z,
-        ограниченное ±3.
+      <p className="dv-note">
+        Ожидаемое значение — нормализация модели LMB (авторская конфигурация, не клинические нормы). Z — отклонение в
+        стандартных отклонениях: «+» вправо — неблагоприятнее, «−» влево — благоприятнее; в модель входит Z, ограниченное ±3.
       </p>
     </section>
   );
 }
 
-/** Мини-траектория: ожидаемое по возрасту (±1 SD) в единицах показателя и точка пациента. */
-function Spark({ t, tone }: { t: Trajectory; tone: string }) {
-  const W = 160, H = 40, P = 4;
+/** Подробные возрастные графики: ожидаемое значение по возрасту (±1 SD) и точка пациента — раскрываемый раздел. */
+export function AgeGraphs({ data }: { data: Record<string, Trajectory> }) {
+  const codes = Object.keys(SYSTEM_OF).filter((c) => c in data);
+  if (codes.length === 0) return null;
+  return (
+    <details className="more details-card age-graphs">
+      <summary>Возрастные графики показателей</summary>
+      <p className="dv-note">
+        Линия — ожидаемое значение для возраста и пола пациента, полоса — ±1 стандартное отклонение, точка — пациент.
+        Каждый график в собственных единицах показателя.
+      </p>
+      <div className="traj-grid">
+        {codes.map((c) => (
+          <TrajectoryChart key={c} code={c} t={data[c]} />
+        ))}
+      </div>
+    </details>
+  );
+}
+
+function TrajectoryChart({ code, t }: { code: string; t: Trajectory }) {
+  const W = 300, H = 150, L = 46, R = 10, T = 12, B = 24;
   const xs = t.curve.map((p) => p.age);
   const ys = t.curve.flatMap((p) => [p.lo, p.hi]).concat(t.value);
   const x0 = Math.min(...xs), x1 = Math.max(...xs);
-  const y0 = Math.min(...ys), y1 = Math.max(...ys);
-  const X = (a: number) => P + ((a - x0) / (x1 - x0 || 1)) * (W - 2 * P);
-  const Y = (v: number) => P + (1 - (v - y0) / (y1 - y0 || 1)) * (H - 2 * P);
+  let y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const pad = (y1 - y0) * 0.08 || 1;
+  y0 -= pad;
+  y1 += pad;
+  const X = (a: number) => L + ((a - x0) / (x1 - x0 || 1)) * (W - L - R);
+  const Y = (v: number) => T + (1 - (v - y0) / (y1 - y0)) * (H - T - B);
   const band = t.curve.map((p, i) => `${i ? "L" : "M"}${X(p.age).toFixed(1)},${Y(p.hi).toFixed(1)}`).join("") +
     t.curve.slice().reverse().map((p) => `L${X(p.age).toFixed(1)},${Y(p.lo).toFixed(1)}`).join("") + "Z";
   const line = t.curve.map((p, i) => `${i ? "L" : "M"}${X(p.age).toFixed(1)},${Y(p.expected).toFixed(1)}`).join("");
+  const tone = toneOf(t.z_raw);
+  const unit = unitRu(t.unit);
+  const d = digitsFor(t.value);
   const at = t.curve.find((p) => p.age === t.age);
   return (
-    <svg className="spark" viewBox={`0 0 ${W} ${H}`} aria-hidden="true" preserveAspectRatio="none">
-      <path className="traj-band" d={band} />
-      <path className="traj-line" d={line} vectorEffect="non-scaling-stroke" />
-      {at && <line className="traj-gap" x1={X(t.age)} x2={X(t.age)} y1={Y(at.expected)} y2={Y(t.value)} vectorEffect="non-scaling-stroke" />}
-      <circle className={`traj-dot ${tone}`} cx={X(t.age)} cy={Y(t.value)} r={3.6} />
-    </svg>
+    <figure className="traj">
+      <figcaption>
+        <strong>{INDEX_LABEL[code] ?? code}</strong>
+        {unit && <span className="muted small"> {unit}</span>}
+        {code === "score2" && <span className="traj-note">отклонение от авторского ожидания, не категория риска</span>}
+        <span className={`traj-z ${tone}`}>Z {signed(t.z_raw, 1)} · {dirText(t.z_raw)}</span>
+      </figcaption>
+      <svg viewBox={`0 0 ${W} ${H}`} role="img"
+        aria-label={`${INDEX_LABEL[code]}: пациент ${fmt(t.value, d)}${unit ? " " + unit : ""}, ожидаемое ${at ? fmt(at.expected, d) : "—"}`}>
+        <line className="traj-gridline" x1={L} x2={W - R} y1={Y(y0 + pad)} y2={Y(y0 + pad)} />
+        <path className="traj-band" d={band} />
+        <path className="traj-line" d={line} />
+        {at && <line className="traj-gap" x1={X(t.age)} x2={X(t.age)} y1={Y(at.expected)} y2={Y(t.value)} />}
+        <circle className={`traj-dot ${tone}`} cx={X(t.age)} cy={Y(t.value)} r={5.5}>
+          <title>{`Пациент, ${t.age} лет: ${fmt(t.value, d)}${unit ? " " + unit : ""}; ожидаемое ${at ? fmt(at.expected, d) : "—"}`}</title>
+        </circle>
+        <text className="traj-tick" x={L - 6} y={Y(y1 - pad) + 4} textAnchor="end">{fmt(y1 - pad, d)}</text>
+        <text className="traj-tick" x={L - 6} y={Y(y0 + pad) + 4} textAnchor="end">{fmt(y0 + pad, d)}</text>
+        <text className="traj-tick" x={X(x0)} y={H - 6} textAnchor="start">{x0}</text>
+        <text className="traj-tick" x={X(x1)} y={H - 6} textAnchor="end">{x1} лет</text>
+        <text className="traj-tick strong" x={X(t.age)} y={H - 6} textAnchor="middle">{t.age}</text>
+      </svg>
+    </figure>
   );
 }

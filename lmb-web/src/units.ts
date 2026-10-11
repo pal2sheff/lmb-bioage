@@ -32,6 +32,10 @@ export const UNIT_RU: Record<string, string> = {
   "kg/m2": "кг/м²",
   "mL/min/1.73m2": "мл/мин/1,73 м²",
   ratio: "",
+  fL: "фл",
+  "g/L": "г/л",
+  "g/dL": "г/дл",
+  years: "лет",
 };
 
 export const unitRu = (u: string | null | undefined) => (u ? UNIT_RU[u] ?? u : "");

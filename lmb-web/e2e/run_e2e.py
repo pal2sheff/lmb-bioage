@@ -208,7 +208,7 @@ def run_browser() -> None:
         page.get_by_role("tab", name="Профиль").click()
         page.get_by_role("button", name="Рассчитать по текущим данным").click()
         expect(page.locator(".branch")).to_have_count(9)
-        expect(page.locator(".integral")).to_contain_text("не рассчитан")
+        expect(page.locator(".status-line")).to_contain_text("не рассчитан")   # клинический итог — строкой
         bone = page.locator(".branch").filter(has_text="Bone")
         expect(bone).to_contain_text("11,4")
         expect(bone).to_contain_text("ручной ввод")
@@ -219,21 +219,22 @@ def run_browser() -> None:
         brain = page.locator(".branch").filter(has_text="Brain")
         expect(brain).to_contain_text("вне области модели CAIDE")           # 66 лет: CAIDE 39–64
         charts = page.locator("section[aria-labelledby=dv-branches]")       # графики общие с калькулятором
-        expect(charts.locator(".dv-row").filter(has_text="Renal")).not_to_have_class("dv-row is-missing")
-        expect(charts.locator(".dv-row.is-missing").filter(has_text="Brain")).to_contain_text("нет вклада")
+        expect(charts.locator(".dv-row").filter(has_text="Почечный")).not_to_have_class("dv-row is-missing")
+        expect(charts.locator(".dv-row.is-missing").filter(has_text="Когнитивно")).to_contain_text("нет вклада")
         expect(page.locator(".dev-grid .dev-row").filter(has_text="eGFR")).to_have_count(1)
-        integral = page.locator(".integral")
-        expect(integral.locator(".age-cell").first).to_contain_text("66")          # паспортный возраст
-        expect(integral.locator(".age-cell.bio")).to_contain_text("не рассчитан")  # 66 лет: вне области 40–64
-        integral.get_by_text("Почему не рассчитан").click()
-        expect(integral).to_contain_text("вне технической области тестирования 40–64")
-        page.get_by_role("switch").check()                                   # режим тестирования
-        expect(integral.locator(".age-cell.pheno")).to_contain_text("не рассчитан")   # нет входов PhenoAge
+        card = page.locator(".research-card")                                # исследовательский расчёт включён
+        expect(card.locator(".figure").first).to_contain_text("66")                 # календарный возраст
+        expect(card).to_contain_text("не рассчитана")                               # 66 лет: вне области 40–64
+        expect(card.locator(".reason-list")).to_contain_text("вне технической области тестирования 40–64")
+        expect(card.locator(".pheno")).to_contain_text("не рассчитан")              # нет входов PhenoAge
+        expect(card.locator(".research-chip")).to_be_visible()
+        page.get_by_text("Подробности расчёта").click()
+        expect(page.locator(".details-card").last).to_contain_text("Редакция модели")
         page.get_by_role("button", name="Проверить воспроизводимость").click()
         expect(page.get_by_text("результат совпадает полностью")).to_be_visible()
         page.wait_for_timeout(800)  # дождаться анимации появления карточек
         page.screenshot(path=SHOTS / "06_profile.png", full_page=True)
-        step("профиль 9 веток, Z-оценки v0.3, графики вкладов и траекторий, паспортный возраст, биологический неприменим вне 40–64 (с причиной), PhenoAge без входов не считается с причинами, расчёт воспроизводится")
+        step("профиль 9 веток, Z-оценки v0.3, графики, исследовательская карточка: неприменима вне 40–64 (с причиной), метаданные в подробностях, PhenoAge без входов не считается с причинами, расчёт воспроизводится")
 
         page.set_viewport_size({"width": 390, "height": 844})
         page.wait_for_timeout(300)
