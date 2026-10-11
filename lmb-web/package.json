@@ -12,9 +12,7 @@
     "calc:build": "tsc -b && vite build --config vite.calc.config.ts"
   },
   "dependencies": {
-    "@fontsource/golos-text": "^5.3.0",
-    "@fontsource/ibm-plex-mono": "^5.3.0",
-    "@fontsource/literata": "^5.3.0",
+    "@fontsource/manrope": "^5.3.0",
     "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

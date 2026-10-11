@@ -1,13 +1,13 @@
+import "@fontsource/manrope/cyrillic-400.css";
+import "@fontsource/manrope/cyrillic-500.css";
+import "@fontsource/manrope/cyrillic-600.css";
+import "@fontsource/manrope/cyrillic-700.css";
+import "@fontsource/manrope/latin-400.css";
+import "@fontsource/manrope/latin-500.css";
+import "@fontsource/manrope/latin-600.css";
+import "@fontsource/manrope/latin-700.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import "@fontsource/golos-text/400.css";
-import "@fontsource/golos-text/500.css";
-import "@fontsource/golos-text/600.css";
-import "@fontsource/literata/500.css";
-import "@fontsource/literata/600.css";
-import "@fontsource/literata/500-italic.css";
-import "@fontsource/ibm-plex-mono/400.css";
-import "@fontsource/ibm-plex-mono/500.css";
 import "./styles.css";
 import { App } from "./App";
 

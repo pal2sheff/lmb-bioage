@@ -164,6 +164,9 @@ export interface Run {
     trajectories?: Record<string, Trajectory>;
     research?: ResearchRes;
     age_years?: number | null;
+    model_version?: string;
+    model_config_sha256?: string;
+    engine_version?: string;
     contributions: Record<string, number> | null;
     intercept: number;
     warnings: string[];
