@@ -1,0 +1,25 @@
+{
+  "for_model": "v0.4",
+  "normalization_code": "score2",
+  "status": "reference_sample_missing",
+  "note": "Запись будущей референтной выборки для пересчёта нормализации Cardio. Все значения заполняются из фактических данных. Технические синтетические тесты 40–64 лет, условный контрольный профиль и 30 случаев HeartScore такой выборкой не являются.",
+  "sample": {
+    "source": null,
+    "description": null,
+    "n_participants": null,
+    "age_min": null,
+    "age_max": null,
+    "sexes": null,
+    "region": null,
+    "inclusion_criteria": null,
+    "exclusion_criteria": null,
+    "score2_applicability_rules": null,
+    "expectation_method": null,
+    "dispersion_method": null,
+    "holdout_method": null,
+    "date": null,
+    "version": null
+  },
+  "fit": null,
+  "validation": null
+}

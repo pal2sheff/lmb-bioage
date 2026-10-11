@@ -12,6 +12,7 @@ from typing import Mapping, Optional
 from . import __version__
 from .cardio import model_for_age
 from .core import Encounter, Status, age_full_years, is_finite_number
+from .experiments import cardio_anchor
 from .indices import run_all
 from .model import (ALL_DOMAINS, UNIT_CONVERSIONS, IntegralResult, ZScore, _inverse, attribute, check_config,
                     config_sha256, domain_score, integral, research_integral, trajectory, zscore)
@@ -85,6 +86,10 @@ def run(enc: Encounter, config: Mapping, external: Optional[Mapping[str, float]]
             attribute(domains[d], config["domains"][d], weights[d])
     integ: IntegralResult = integral(domains, config, age, check)
     research = research_integral(domains, config, age, check)   # отдельный блок, не клинический итог
+    # проверочный режим Cardio (не меняет v0.3; показывается врачу по переключателю)
+    research["cardio_anchor_experiment"] = (
+        cardio_anchor(enc, indices, research, config["integral"]["weights"])
+        if enc.birth_date is not None and enc.sex is not None else None)
 
     # траектории: ожидаемое значение по нормализации от возраста (±1 SD) и точка пациента
     trajectories = {}

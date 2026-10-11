@@ -35,3 +35,25 @@ export function ResearchToggle({ on, onChange }: { on: boolean; onChange: (v: bo
     </label>
   );
 }
+
+const CHECK_KEY = "lmb.cardioCheck";
+
+/** Проверочный расчёт Cardio — включается явно, по умолчанию выключен. */
+export function useCardioCheck(): [boolean, (v: boolean) => void] {
+  const [on, setOn] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem(CHECK_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const set = (v: boolean) => {
+    setOn(v);
+    try {
+      window.localStorage.setItem(CHECK_KEY, v ? "1" : "0");
+    } catch {
+      /* хранилище недоступно */
+    }
+  };
+  return [on, set];
+}

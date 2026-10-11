@@ -18,6 +18,8 @@ test = ["pytest>=7", "pytest-cov>=4", "httpx>=0.27"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# краткая сводка упавших тестов всегда: нужна для поиска редкого нестабильного теста (CLAUDE.md)
+addopts = "-rfE"
 pythonpath = [".", "../lmb-engine"]
 
 [tool.setuptools.packages.find]
