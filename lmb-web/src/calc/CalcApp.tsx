@@ -359,16 +359,23 @@ export function CalcApp() {
             с диска.
           </Alert>
         )}
+        <div className="tabs-row">
         <nav className="tabs" role="tablist" aria-label="Разделы">
           {SECTIONS.map(([key, label], n) => (
             <button key={key} type="button" role="tab" aria-selected={section === key && !report}
-              className={section === key && !report ? "tab active" : "tab"} onClick={() => { setReport(false); setSection(key); }}>
+              className={section === key && !report ? "tab active" : "tab"} onClick={() => { setReport(false); setSection(key); setMsg(""); }}>
               <span className="tab-step">{n + 1}</span> {label}
               {key === "data" && errorCount > 0 && <span className="tab-count" aria-label={`ошибок: ${errorCount}`}>{errorCount}</span>}
               {key === "questionnaire" && engine && <span className="muted small num">{qDone}/{qItems.length}</span>}
             </button>
           ))}
         </nav>
+        {engine && result && section === "results" && !report && (
+          <div className="tabs-actions no-print">
+            <Button kind="primary" onClick={() => setReport(true)}>Сформировать отчёт</Button>
+          </div>
+        )}
+        </div>
 
         {!engine && !loadErr && <p className="loading">{stage}</p>}
         <Alert kind="info">{msg}</Alert>
@@ -413,13 +420,7 @@ export function CalcApp() {
         {engine && section === "results" && !report && (
           <section id="profile" aria-label="Результаты">
             {result ? (
-              <>
-                <div className="toolbar results-toolbar no-print">
-                  <span />
-                  <Button kind="primary" onClick={() => setReport(true)}>Сформировать отчёт</Button>
-                </div>
-                <ProfileView result={result} catalog={engine.catalog} goTo={goTo} />
-              </>
+              <ProfileView result={result} catalog={engine.catalog} goTo={goTo} />
             ) : (
               <Empty go={() => setSection("data")} />
             )}

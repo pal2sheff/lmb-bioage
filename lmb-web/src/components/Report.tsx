@@ -1,10 +1,11 @@
 // Отчёт врача для печати: те же данные расчётного модуля, сведённые в таблицы.
 // PhenoAge — самостоятельный показатель; сравнения с LMB в отчёте нет (решение владельца 11.10.2026).
+// Методические пояснения — одним компактным блоком в конце (уточнение 11.10.2026, 21:24).
 import { fmt } from "../api";
 import type { Catalog, IndexRes } from "../types";
 import { unitRu } from "../units";
 import { signed } from "./Charts";
-import { AcrSource, CalcDetails, DIGITS, DOMAIN_LABEL, type EngineResult, reasonsRu } from "./ProfileView";
+import { AcrSource, DIGITS, DOMAIN_LABEL, type EngineResult, Methodology, reasonsRu } from "./ProfileView";
 import { useResearchMode } from "./TestMode";
 import { Button, StatusBadge } from "./ui";
 
@@ -21,7 +22,7 @@ export function Report(props: {
   const r = result.research;
   const rOk = research && r?.status === "calculated" && r.bioage_years !== null;
   const pheno = idx.get("phenoage");
-  const why = reasonsRu(result.blocking_reasons, catalog);
+  const lmbNote = !research ? "расчёт выключен" : rOk ? "" : r ? `не рассчитан${r.reasons.length ? `: ${reasonsRu(r.reasons, catalog).slice(0, 2).join("; ")}` : ""}` : "";
   return (
     <article className="report">
       <div className="toolbar no-print">
@@ -53,37 +54,22 @@ export function Report(props: {
         <table className="report-table compact">
           <tbody>
             <tr>
-              <td>
-                <strong>PhenoAge</strong> <span className="muted small">фенотипический возраст (Levine 2018)</span>
-              </td>
+              <td><strong>Календарный возраст</strong></td>
+              <td className="r num">{result.age_years ?? "—"} лет</td>
+              <td />
+            </tr>
+            <tr>
+              <td><strong>LMB BioAge</strong> <span className="muted small">расчётная оценка</span></td>
+              <td className="r num">{rOk ? `${fmt(r.bioage_years, 1)} лет` : "—"}</td>
+              <td className="small">{rOk ? `разница с календарным ${signed(r.delta_years!, 1)} лет` : lmbNote}</td>
+            </tr>
+            <tr>
+              <td><strong>PhenoAge</strong> <span className="muted small">фенотипический возраст</span></td>
               <td className="r num">{pheno?.status === "calculated" ? `${fmt(pheno.value, 1)} лет` : "—"}</td>
               <td>{pheno && pheno.status !== "calculated" ? <StatusBadge status={pheno.status} /> : null}</td>
             </tr>
-            <tr>
-              <td>
-                <strong>LMB BioAge</strong> <span className="muted small">клинический итог</span>
-              </td>
-              <td className="r">—</td>
-              <td className="small">не рассчитан{why.length ? `: ${why.join("; ")}` : ""}</td>
-            </tr>
-            {research && r && (
-              <tr>
-                <td>
-                  <strong>LMB BioAge</strong> <span className="muted small">исследовательская оценка · не валидирована</span>
-                </td>
-                <td className="r num">{rOk ? `${fmt(r.bioage_years, 1)} лет` : "—"}</td>
-                <td className="small">
-                  {rOk ? `календарный возраст ${result.age_years ?? "—"}; разница ${signed(r.delta_years!, 1)}` : "не рассчитана"}
-                </td>
-              </tr>
-            )}
           </tbody>
         </table>
-        {research && r && (
-          <p className="limits" role="note">
-            {r.limitations.join(" ")} Изменение оценки не означает доказанного лечебного эффекта.
-          </p>
-        )}
       </section>
 
       <section className="card report-section">
@@ -149,7 +135,7 @@ export function Report(props: {
 
       {rOk && r.contributions && (
         <section className="card report-section">
-          <h2>Вклады систем в исследовательскую оценку</h2>
+          <h2>Вклады систем в LMB BioAge, лет</h2>
           <table className="report-table compact">
             <tbody>
               {Object.entries(r.contributions).map(([d, v]) => (
@@ -176,7 +162,10 @@ export function Report(props: {
         </section>
       )}
 
-      <CalcDetails result={result} open />
+      <section className="card report-section report-method">
+        <h2>О методике</h2>
+        <Methodology result={result} catalog={catalog} />
+      </section>
     </article>
   );
 }

@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { fmt } from "../api";
-import type { CardioAnchor, Catalog, DomainRes, IndexRes, Run, ZRes } from "../types";
+import type { CardioAnchor, Catalog, IndexRes, Run } from "../types";
 import { unitRu } from "../units";
-import { AgeGraphs, BranchContributions, DeviationChart, IndicatorDrivers, signed } from "./Charts";
+import { BranchContributions, DeviationChart, signed } from "./Charts";
 import { ResearchToggle, useCardioCheck, useResearchMode } from "./TestMode";
 import { StatusBadge } from "./ui";
 
@@ -48,16 +48,12 @@ const FORMULA: Record<string, string> = {
   asmi: "ASMI = масса мышц конечностей / рост²",
   phenoage: "Levine 2018 (поправка PLoS Med 2019): альбумин, креатинин, глюкоза, вч-СРБ, лимфоциты %, MCV, RDW, ЩФ, лейкоциты, возраст",
 };
-const Z_LABEL: Record<string, string> = {
-  score2: "SCORE2", egfr: "eGFR", acr: "ACR", fib4: "FIB-4", homa_ir: "HOMA-IR", tyg: "TyG", aip: "AIP",
-  whtr: "WHtR", nlr: "NLR", sii: "SII", caide: "CAIDE", frax_major: "FRAX осн.",
-};
-const DOMAIN_INPUTS: Record<string, string[]> = {
-  cardio: ["score2"], metabolic: ["homa_ir", "tyg", "aip", "whtr"], renal: ["egfr", "acr"], hepatic: ["fib4"],
-  inflammation: ["nlr", "sii"], brain: ["caide"], bone: ["frax_major"],
-};
-/** Модули оборудования без подключённого ввода — показываются свёрнутыми. */
-const EXTRA_BRANCHES = ["muscle", "adaptive"];
+/** SCORE2 и SCORE2-OP взаимоисключающие по возрасту: неприменимость второго при рассчитанном первом — не ограничение. */
+const PARTNER: Record<string, string> = { score2: "score2_op", score2_op: "score2" };
+function isComplement(res: IndexRes, all: { code: string; status: string }[]): boolean {
+  const p = PARTNER[res.code];
+  return !!p && res.status === "not_applicable" && all.some((i) => i.code === p && i.status === "calculated");
+}
 
 /** Русские названия полей для сообщений (без внутренних кодов). */
 export function fieldNames(catalog: Catalog): Record<string, string> {
@@ -100,155 +96,163 @@ export function FieldLinks({ codes, names, goTo }: { codes: string[]; names: Rec
   );
 }
 
-/** Результаты: возрастные показатели → клинические индексы → ограничения и пропуски → доп. разделы → исследовательский раздел. */
+/**
+ * Результаты (уточнение владельца 11.10.2026, 21:24): возраст и PhenoAge → инфографика (видна сразу) →
+ * показатели по системам → недостающие данные → «О методике» (статус, область, настройки, техданные).
+ */
 export function ProfileView({ result, catalog, meta, goTo }: { result: EngineResult; catalog: Catalog; meta?: ReactNode; goTo?: GoTo }) {
   const idx = new Map(result.indices.map((i) => [i.code, i]));
-  const doms = new Map(result.domains.map((d) => [d.domain, d]));
   const [research, setResearch] = useResearchMode();
   const names = fieldNames(catalog);
-  const bio = research && result.research?.status === "calculated" ? result.research : null;
-  const main = catalog.branches.filter((b) => !EXTRA_BRANCHES.includes(b.code));
-  const extra = catalog.branches.filter((b) => EXTRA_BRANCHES.includes(b.code));
+  const r = research ? result.research ?? null : null;
+  const delta = r?.status === "calculated" ? r.delta_years : null;
   return (
     <>
-      <h2 className="section-title">Возрастные показатели</h2>
-      <div className="age-grid">
+      <div className="summary-grid">
+        <AgeSummary result={result} catalog={catalog} research={research} />
         <PhenoAgeCard res={idx.get("phenoage")} names={names} goTo={goTo} />
-        <LmbCard result={result} catalog={catalog} research={research} setResearch={setResearch} />
       </div>
 
-      <h2 className="section-title">Клинические индексы</h2>
+      {r ? (
+        <div className="charts-grid">
+          <BranchContributions domains={result.domains} intercept={result.intercept} delta={delta} />
+          {result.trajectories && <DeviationChart data={result.trajectories} />}
+        </div>
+      ) : (
+        <p className="muted small charts-off">
+          Расчётная оценка LMB и инфографика выключены —{" "}
+          <button type="button" className="link-btn" onClick={openMethod}>включить в разделе «О методике»</button>
+        </p>
+      )}
+
+      <h2 className="section-title results-title">Показатели по системам</h2>
       <div className="branch-grid">
-        {main.map((b) => (
-          <SystemCard key={b.code} code={b.code} name={b.name} indices={b.indices} idx={idx} domain={doms.get(b.code)}
-            zs={result.zscores ?? {}} catalog={catalog} research={research} names={names} goTo={goTo} />
+        {catalog.branches.map((b) => (
+          <SystemCard key={b.code} name={b.name} indices={b.indices} idx={idx} catalog={catalog} names={names} goTo={goTo} />
         ))}
       </div>
 
       <GapsCard result={result} catalog={catalog} names={names} goTo={goTo} />
 
-      <details className="more details-card extra-branches">
-        <summary>Дополнительные разделы: мышечный и адаптационный профили (оборудование не подключено)</summary>
-        <div className="branch-grid">
-          {extra.map((b) => (
-            <SystemCard key={b.code} code={b.code} name={b.name} indices={b.indices} idx={idx} domain={doms.get(b.code)}
-              zs={result.zscores ?? {}} catalog={catalog} research={false} names={names} goTo={goTo} />
-          ))}
-        </div>
+      <details className="more details-card method" id="method">
+        <summary>О методике</summary>
+        <Methodology result={result} catalog={catalog} extra={meta}
+          settings={
+            <>
+              {result.research && <ResearchToggle on={research} onChange={setResearch} />}
+              {research && result.research?.cardio_anchor_experiment && (
+                <CardioCheck x={result.research.cardio_anchor_experiment} result={result} />
+              )}
+            </>
+          } />
       </details>
-
-      {research && (
-        <details className="research-section" open>
-          <summary>Исследовательский раздел LMB BioAge</summary>
-          <p className="limits" role="note">
-            Исследовательская модель, клиническая валидация не проведена. Вклады, отклонения и графики описывают
-            авторскую модель, а не клинические нормы.
-          </p>
-          <div className="dv-stack">
-            <BranchContributions domains={result.domains} catalog={catalog} intercept={result.intercept} total={bio !== null} />
-            <IndicatorDrivers domains={result.domains} catalog={catalog} />
-          </div>
-          {result.trajectories && <DeviationChart data={result.trajectories} />}
-          {result.trajectories && <AgeGraphs data={result.trajectories} />}
-          {result.research?.cardio_anchor_experiment && <CardioCheck x={result.research.cardio_anchor_experiment} result={result} />}
-        </details>
-      )}
-
-      <CalcDetails result={result} extra={meta} />
     </>
   );
 }
 
-/** PhenoAge — самостоятельный показатель: свой статус, не зависит от LMB и исследовательского режима. */
-export function PhenoAgeCard({ res, names, goTo }: { res?: IndexRes; names: Record<string, string>; goTo?: GoTo }) {
-  if (!res) return null;
-  const ok = res.status === "calculated" && res.value !== null;
+/** Открыть «О методике» и прокрутить к нему. */
+function openMethod() {
+  const el = document.getElementById("method") as HTMLDetailsElement | null;
+  if (!el) return;
+  el.open = true;
+  el.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function toGaps() {
+  document.getElementById("gaps-title")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+/** Компактный блок: календарный возраст, LMB BioAge (расчётная оценка тестового режима), разница. */
+function AgeSummary({ result, catalog, research }: { result: EngineResult; catalog: Catalog; research: boolean }) {
+  const r = result.research;
+  const age = result.age_years ?? null;
+  const ok = research && !!r && r.status === "calculated" && r.bioage_years !== null && r.delta_years !== null;
+  const d = ok ? r!.delta_years! : 0;
+  const why = r && !ok && research ? reasonsRu(r.reasons, catalog) : [];
   return (
-    <section className="age-card" aria-labelledby="pheno-title">
-      <header className="age-card-head">
-        <h3 id="pheno-title">PhenoAge</h3>
-        {!ok && <StatusBadge status={res.status} />}
-      </header>
-      <p className="age-card-sub">Фенотипический возраст (Levine 2018) по биохимии и общему анализу крови</p>
-      {ok ? (
-        <p className="age-card-value">
-          <span className="figure-value num">{fmt(res.value, 1)}</span> <span className="figure-unit">лет</span>
-        </p>
-      ) : (
-        <p className="age-card-value"><span className="figure-value empty">не рассчитан</span></p>
-      )}
-      <IndexNotes res={res} names={names} goTo={goTo} />
+    <section className="age-summary" aria-label="Возраст">
+      <div className="figure">
+        <span className="eyebrow">Календарный возраст</span>
+        <span className="figure-value secondary num">
+          {age ?? "—"} <span className="figure-unit">лет</span>
+        </span>
+      </div>
+      <div className="figure">
+        <span className="eyebrow">
+          LMB BioAge
+          <button type="button" className="info-btn" aria-label="О методике LMB BioAge" onClick={openMethod}>i</button>
+        </span>
+        {ok ? (
+          <span className="figure-value bio-value num">
+            {fmt(r!.bioage_years, 1)} <span className="figure-unit">лет</span>
+          </span>
+        ) : (
+          <>
+            <span className="figure-value empty">{research ? "не рассчитан" : "выключен"}</span>
+            {why.length > 0 && (
+              <span className="figure-note why">
+                {why.slice(0, 2).join("; ")}{" "}
+                <button type="button" className="link-btn" onClick={toGaps}>что нужно</button>
+              </span>
+            )}
+          </>
+        )}
+      </div>
+      <div className="figure">
+        <span className="eyebrow">Разница</span>
+        {ok ? (
+          <>
+            <span className="figure-value secondary num">
+              {signed(d, 1)} <span className="figure-unit">лет</span>
+            </span>
+            <span className={`delta ${d > 0 ? "up" : d < 0 ? "down" : ""}`}>
+              {d > 0 ? "старше календарного" : d < 0 ? "моложе календарного" : "равен календарному"}
+            </span>
+          </>
+        ) : (
+          <span className="figure-value empty">—</span>
+        )}
+      </div>
     </section>
   );
 }
 
-/** LMB BioAge: клинический статус и (в исследовательском режиме) исследовательская оценка. */
-function LmbCard({ result, catalog, research, setResearch }: {
-  result: EngineResult; catalog: Catalog; research: boolean; setResearch: (v: boolean) => void;
-}) {
-  const r = result.research;
-  const age = result.age_years ?? null;
-  const ok = !!r && r.status === "calculated" && r.bioage_years !== null && r.delta_years !== null;
-  const d = r?.delta_years ?? 0;
-  const why = reasonsRu(result.blocking_reasons, catalog);
+/** Кнопка информации: формулы, источники и пояснения — по нажатию. */
+export function Info({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <section className={research ? "age-card research-card" : "age-card"} aria-labelledby="research-title">
-      <header className="age-card-head">
-        <h3 id="research-title">LMB BioAge</h3>
-        <span className="research-chip">
-          <span aria-hidden="true">◆</span> Исследовательский статус · не валидирован
+    <details className="info">
+      <summary aria-label={`Подробнее: ${label}`} title="Подробнее">i</summary>
+      <div className="info-body">{children}</div>
+    </details>
+  );
+}
+
+/** PhenoAge — самостоятельный показатель: свой статус, не зависит от LMB и режима расчёта. */
+export function PhenoAgeCard({ res, names, goTo }: { res?: IndexRes; names: Record<string, string>; goTo?: GoTo }) {
+  if (!res) return null;
+  const ok = res.status === "calculated" && res.value !== null;
+  // методические оговорки (сверка с внешним калькулятором) — в справке, а не на основном экране
+  // ошибка ввода — коротко, ссылками на поля; полный текст — в «Ограничениях и недостающих данных»
+  const notes = { ...res, warnings: [], reasons: res.status === "invalid_input" ? [] : res.reasons };
+  return (
+    <section className="pheno-card" aria-labelledby="pheno-title">
+      <span className="eyebrow">
+        <span id="pheno-title">PhenoAge</span>
+        <Info label="PhenoAge">
+          <span>{FORMULA.phenoage}</span>
+          <span>Самостоятельный показатель: в LMB BioAge не входит.</span>
+          {res.warnings.map((w) => (
+            <span key={w}>{w}</span>
+          ))}
+        </Info>
+      </span>
+      {ok ? (
+        <span className="figure-value num">
+          {fmt(res.value, 1)} <span className="figure-unit">лет</span>
         </span>
-      </header>
-      <p className="age-card-sub">
-        Клинический итог не рассчитан{why.length ? `: ${why.join("; ")}` : ""}.
-      </p>
-      {r && <ResearchToggle on={research} onChange={setResearch} />}
-      {research && r ? (
-        <>
-          <div className="figures">
-            <div className="figure">
-              <span className="eyebrow">Календарный возраст</span>
-              <span className="figure-value secondary">{age ?? "—"}</span>
-              <span className="figure-note">лет на дату обследования</span>
-            </div>
-            <div className="figure">
-              <span className="eyebrow">Расчётная оценка</span>
-              {ok ? <span className="figure-value bio-value">{fmt(r.bioage_years, 1)}</span> : <span className="figure-value empty">не рассчитана</span>}
-              <span className="figure-note">лет, исследовательская модель</span>
-            </div>
-            <div className="figure">
-              <span className="eyebrow">Разница</span>
-              {ok ? (
-                <>
-                  <span className="figure-value secondary">{signed(d, 1)}</span>
-                  <span className={`delta ${d > 0 ? "up" : d < 0 ? "down" : ""}`}>
-                    {d > 0 ? "выше календарного" : d < 0 ? "ниже календарного" : "равна календарному"}
-                  </span>
-                </>
-              ) : (
-                <span className="figure-value empty">—</span>
-              )}
-            </div>
-          </div>
-          {!ok && r.reasons.length > 0 && (
-            <div className="why-block">
-              <p className="strong" style={{ margin: "16px 0 0" }}>Почему не рассчитана:</p>
-              <ul className="reason-list">
-                {reasonsRu(r.reasons, catalog).map((x) => (
-                  <li key={x}>{x}</li>
-                ))}
-              </ul>
-              <p className="muted small">Какие данные нужны — в разделе «Ограничения и недостающие данные».</p>
-            </div>
-          )}
-          <p className="limits" role="note">
-            {r.limitations.length > 0 ? r.limitations.join(" ") : "Исследовательская модель. Клиническая валидация не проведена."}{" "}
-            Изменение оценки не означает доказанного лечебного эффекта.
-          </p>
-        </>
       ) : (
-        <p className="muted small">Исследовательский режим выключен: оценка модели и исследовательский раздел скрыты.</p>
+        <span className="figure-value empty">не рассчитан</span>
       )}
+      <IndexNotes res={notes} names={names} goTo={goTo} />
     </section>
   );
 }
@@ -321,41 +325,16 @@ function CardioCheck({ x, result }: { x: CardioAnchor; result: EngineResult }) {
 }
 
 function SystemCard(props: {
-  code: string; name: string; indices: string[]; idx: Map<string, IndexRes>; domain?: DomainRes;
-  zs: Record<string, ZRes>; catalog: Catalog; research: boolean; names: Record<string, string>; goTo?: GoTo;
+  name: string; indices: string[]; idx: Map<string, IndexRes>; catalog: Catalog; names: Record<string, string>; goTo?: GoTo;
 }) {
-  const { code, name, indices, idx, domain: d, zs, catalog, research, names, goTo } = props;
+  const { name, indices, idx, catalog, names, goTo } = props;
   return (
     <article className="branch" aria-label={name}>
-      <header>
-        <h3>{name}</h3>
-      </header>
-      {indices.length === 0 && <p className="index-expl">Ввод показателей LQ One — следующая очередь (сопоставление полей готово).</p>}
+      <h3>{name}</h3>
+      {indices.length === 0 && <p className="index-expl">Данные LQ One пока не подключены</p>}
       {indices.map((c) => (
-        <IndexBlock key={c} code={c} res={idx.get(c)} catalog={catalog} names={names} goTo={goTo} />
+        <IndexBlock key={c} code={c} res={idx.get(c)} idx={idx} catalog={catalog} names={names} goTo={goTo} />
       ))}
-      {research && d && d.status !== "not_included" && (
-        <footer className="domain-line">
-          <span title="Оценка системы в модели LMB — безразмерная, не годы">Оценка системы (модель LMB)</span>
-          <span className={d.status === "calculated" ? "num strong" : "muted"}>
-            {d.status === "calculated" ? fmt(d.score, 2) : DOMAIN_LABEL[d.status] ?? d.status}
-          </span>
-        </footer>
-      )}
-      {research && d && (DOMAIN_INPUTS[code] ?? []).some((c) => c in zs) && (
-        <details className="more">
-          <summary>Подробнее об оценке</summary>
-          <div className="more-body">
-            <ZLine domain={d} zs={zs} />
-            {d.coefficient !== null && (
-              <span>
-                коэффициент модели {fmt(d.coefficient, 1)}
-                {d.contribution !== null && <> · вклад {signed(d.contribution, 2)}</>}
-              </span>
-            )}
-          </div>
-        </details>
-      )}
     </article>
   );
 }
@@ -388,57 +367,58 @@ function IndexNotes({ res, names, goTo }: { res: IndexRes; names: Record<string,
   );
 }
 
-function IndexBlock({ code, res, catalog, names, goTo }: {
-  code: string; res: IndexRes | undefined; catalog: Catalog; names: Record<string, string>; goTo?: GoTo;
+function IndexBlock({ code, res, idx, catalog, names, goTo }: {
+  code: string; res: IndexRes | undefined; idx: Map<string, IndexRes>; catalog: Catalog; names: Record<string, string>; goTo?: GoTo;
 }) {
   const label = catalog.index_labels[code];
   if (!res) return null;
   const unit = unitRu(res.unit);
   const show = res.value !== null && res.status === "calculated";
   const e = res.extra as Record<string, unknown>;
-  const extra = details(code, res);
+  // при рассчитанном SCORE2 неприменимость SCORE2-OP (и наоборот) — справка, а не предупреждение
+  const quiet = isComplement(res, [...idx.values()]);
+  const shown = quiet ? { ...res, reasons: [] } : res;
+  const info = (
+    <Info label={label?.short ?? code}>
+      {label?.name && <strong>{label.name}</strong>}
+      {FORMULA[code] && <span className="formula">{FORMULA[code]}</span>}
+      {quiet && res.reasons.map((x) => <span key={x}>{x}</span>)}
+      {details(code, res).map((x) => (
+        <span key={x}>{x}</span>
+      ))}
+    </Info>
+  );
+  const status = res.status !== "calculated" && <StatusBadge status={res.status} />;
+  if (code === "frax_kz" && show)
+    return (
+      <div className="index-line">
+        <div className="index-row">
+          <span className="index-name"><strong>FRAX</strong> <span className="muted">основные</span>{info}</span>
+          <span className="index-val num">{fmt(res.value, 1)}<span className="unit">%</span></span>
+        </div>
+        <div className="index-row">
+          <span className="index-name"><strong>FRAX</strong> <span className="muted">бедро</span></span>
+          <span className="index-val num">{fmt(e.hip_10y_pct as number, 1)}<span className="unit">%</span></span>
+        </div>
+        <span className="index-expl">из официального калькулятора FRAX · модель Казахстана · {e.with_bmd ? "с МПК" : "без МПК"}</span>
+        <IndexNotes res={res} names={names} goTo={goTo} />
+      </div>
+    );
   return (
     <div className="index-line">
-      <div className="index-name">
-        <strong>{label?.short ?? code}</strong>
-        {res.status !== "calculated" && <StatusBadge status={res.status} />}
+      <div className="index-row">
+        <span className="index-name"><strong>{label?.short ?? code}</strong>{info}</span>
+        {show ? (
+          <span className="index-val num">
+            {fmt(res.value, DIGITS[code] ?? 2)}
+            {unit && <span className="unit">{unit}</span>}
+          </span>
+        ) : (
+          status
+        )}
       </div>
-      {code === "frax_kz" && show ? (
-        <div className="frax-pair">
-          <span className="index-val num">
-            {fmt(res.value, 1)}<span className="unit">%</span>
-          </span>
-          <span className="index-expl">основные остеопоротические переломы, 10 лет</span>
-          <span className="index-val num">
-            {fmt(e.hip_10y_pct as number, 1)}<span className="unit">%</span>
-          </span>
-          <span className="index-expl">перелом бедра, 10 лет</span>
-          <span className="index-expl strong-note">
-            Перенесено из официального калькулятора FRAX (модель Казахстана, {e.with_bmd ? "с МПК" : "без МПК"})
-          </span>
-        </div>
-      ) : (
-        <>
-          <span className={show ? "index-val num" : "index-val empty"}>
-            {show ? fmt(res.value, DIGITS[code] ?? 2) : "—"}
-            {show && unit && <span className="unit">{unit}</span>}
-          </span>
-          <span className="index-expl">{label?.name}</span>
-        </>
-      )}
       {code === "acr" && <AcrSource res={res} />}
-      <IndexNotes res={res} names={names} goTo={goTo} />
-      {(FORMULA[code] || extra.length > 0) && (
-        <details className="more">
-          <summary>Подробнее</summary>
-          <div className="more-body">
-            {FORMULA[code] && <span className="formula">{FORMULA[code]}</span>}
-            {extra.map((x) => (
-              <span key={x}>{x}</span>
-            ))}
-          </div>
-        </details>
-      )}
+      <IndexNotes res={shown} names={names} goTo={goTo} />
     </div>
   );
 }
@@ -495,7 +475,7 @@ function GapsCard({ result, catalog, names, goTo }: { result: EngineResult; cata
         invalid.push({ msg: r, fields: i.invalid_fields ?? [] });
       }
     if (i.status === "awaiting_review") i.reasons.forEach((r) => !review.includes(r) && review.push(r));
-    if (i.status === "not_applicable") i.reasons.forEach((r) => limits.push(`${label(i.code)}: ${r}`));
+    if (i.status === "not_applicable" && !isComplement(i, result.indices)) i.reasons.forEach((r) => limits.push(`${label(i.code)}: ${r}`));
   }
   if (missing.size + invalid.length + review.length + limits.length === 0) return null;
   return (
@@ -555,60 +535,50 @@ function GapsCard({ result, catalog, names, goTo }: { result: EngineResult; cata
   );
 }
 
-function ZLine({ domain, zs }: { domain: DomainRes; zs: Record<string, ZRes> }) {
-  const codes = (DOMAIN_INPUTS[domain.domain] ?? []).filter((c) => c in zs);
-  return (
-    <span className="z-line">
-      {codes.map((c, i) => {
-        const z = zs[c];
-        return (
-          <span key={c}>
-            {i > 0 && " · "}
-            Z {Z_LABEL[c] ?? c}
-            {c === "score2" ? " (от авторского ожидания)" : ""}{" "}
-            {z.z_raw === null ? (
-              <span className="muted">—</span>
-            ) : (
-              <span className="num">
-                {fmt(z.z_raw, 2)}
-                {z.z_clipped !== z.z_raw && <span className="muted"> → {fmt(z.z_clipped, 0)}</span>}
-              </span>
-            )}
-          </span>
-        );
-      })}
-    </span>
-  );
-}
-
-/** Технические метаданные расчёта — раскрываются по запросу. */
-export function CalcDetails({ result, extra, open }: { result: EngineResult; extra?: ReactNode; open?: boolean }) {
+/** О методике: статус, область, правила расчёта, настройки режима (на экране) и технические данные — одним блоком. */
+export function Methodology({ result, catalog, extra, settings }: {
+  result: EngineResult; catalog: Catalog; extra?: ReactNode; settings?: ReactNode;
+}) {
   const r = result.research;
+  const why = reasonsRu(result.blocking_reasons, catalog);
+  const pop = r?.research_population;
   return (
-    <details className="more details-card" open={open}>
-      <summary>Подробности расчёта</summary>
+    <div className="method-body">
+      {settings && <div className="method-settings no-print">{settings}</div>}
+      <ul className="method-list">
+        <li>
+          {r && r.limitations.length > 0 ? r.limitations.join(" ") : "Исследовательская модель. Клиническая валидация не проведена."}
+        </li>
+        <li>
+          Значение LMB BioAge — расчётная оценка локального тестового режима
+          {pop ? ` (синтетические профили ${pop.age_min}–${pop.age_max} лет, не референтная выборка)` : ""}.
+          {why.length > 0 && <> Клинический итог не рассчитан: {why.join("; ")}.</>}
+        </li>
+        <li>
+          Разница с календарным возрастом = постоянная {signed(result.intercept, 2)} + сумма вкладов семи систем;
+          вклад = коэффициент модели × оценка системы. Оценка системы объединяет Z показателей: Z = (значение −
+          ожидаемое для возраста и пола) / разброс, в модель входит Z в пределах ±3. Ожидаемые значения — авторская
+          нормализация, не клинические нормы. Мышечный и адаптационный профили в модель не входят.
+        </li>
+        <li>Изменение оценки между визитами не означает доказанного лечебного эффекта.</li>
+        <li>PhenoAge — самостоятельный показатель (Levine 2018, поправка 2019), в LMB BioAge не входит.</li>
+        <li>
+          FRAX — результат официального калькулятора, модель Казахстана; приложение FRAX не рассчитывает. FRAX не
+          предназначен для оценки эффективности лечения.
+        </li>
+      </ul>
       <dl className="meta-list">
         <dt>Модель</dt>
         <dd>
           {result.model_version ?? "—"} · конфигурация {(result.model_config_sha256 ?? "").slice(0, 12) || "—"}
+          {r ? ` · научный статус: ${r.scientific_status === "not_validated" ? "не валидирована" : r.scientific_status}` : ""}
         </dd>
         <dt>Расчётный модуль</dt>
         <dd>{result.engine_version ?? "—"}</dd>
         <dt>Снимок входов</dt>
         <dd className="num">{result.input_version}</dd>
-        {r && (
-          <>
-            <dt>Исследовательский режим</dt>
-            <dd>
-              {r.mode ?? "—"} · научный статус: {r.scientific_status === "not_validated" ? "не валидирована" : r.scientific_status}
-              {r.research_population ? ` · техническая область ${r.research_population.age_min}–${r.research_population.age_max} лет` : ""}
-            </dd>
-          </>
-        )}
-        <dt>Постоянная модели</dt>
-        <dd className="num">{signed(result.intercept, 2)}</dd>
       </dl>
       {extra}
-    </details>
+    </div>
   );
 }

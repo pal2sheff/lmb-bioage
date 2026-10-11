@@ -1,4 +1,5 @@
 // Переключатель исследовательского расчёта (решение владельца 11.10.2026): явный, по умолчанию включён.
+// С 11.10.2026 (21:24) находится в разделе «О методике»; основной экран показывает оценку и графики без переключателей.
 // Состояние запоминается в этом браузере — удобство врача, не настройка модели.
 import { useState } from "react";
 
@@ -28,10 +29,10 @@ export function ResearchToggle({ on, onChange }: { on: boolean; onChange: (v: bo
     <label className="research-toggle no-print">
       <span className="switch">
         <input type="checkbox" role="switch" checked={on} onChange={(e) => onChange(e.target.checked)}
-          aria-label="Исследовательский режим" />
+          aria-label="Расчётная оценка LMB и инфографика" />
         <span />
       </span>
-      Исследовательский режим
+      Расчётная оценка LMB и инфографика (локальный тестовый режим)
     </label>
   );
 }

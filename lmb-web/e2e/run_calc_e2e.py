@@ -79,39 +79,66 @@ def run(base: str) -> None:
 
         example(1)
         tab("Результаты")
-        pheno = page.locator(".age-card").filter(has_text="PhenoAge")
-        expect(pheno.locator(".figure-value")).to_have_text("50,1")
-        lmb = page.locator(".age-card").filter(has_text="LMB BioAge")
-        expect(lmb.locator(".bio-value")).to_have_text("58,6")
-        expect(lmb).to_contain_text("Исследовательский статус · не валидирован")
-        expect(lmb.locator(".limits")).to_contain_text("Клиническая валидация не проведена")
+        pheno = page.locator(".pheno-card")
+        expect(pheno.locator(".figure-value")).to_contain_text("50,1")
+        lmb = page.locator(".age-summary")
+        expect(lmb.locator(".bio-value")).to_contain_text("58,6")
+        expect(lmb).to_contain_text("+3,6")
+        expect(lmb).to_contain_text("55")
+        branches = page.locator("section[aria-labelledby=dv-branches]")
+        deviation = page.locator("section[aria-labelledby=dv-dev]")
+        expect(branches.locator(".dv-row")).to_have_count(7)               # графики видны сразу, без раскрытия
+        expect(deviation.locator(".dev-grid .dev-row")).to_have_count(12)
+        expect(page.locator(".branch")).to_have_count(9)
         body = page.locator("main").inner_text()
-        for banned in ("LMB − PhenoAge", "Контроль", "контроль PhenoAge", "Рассчитано", "v0.3"):
+        for banned in ("LMB − PhenoAge", "Контроль", "Рассчитано", "v0.3", "sha256", "Исследовательский статус",
+                       "не валидирован", "Исследовательская модель", "Клинический итог не рассчитан",
+                       "целевая популяция", "Проверочный расчёт", "Оценка системы", "Z eGFR", "сверен"):
             assert banned not in body, banned
         for eng in ("Cardio\n", "Metabolic\n", "Renal\n"):
-            assert eng not in page.locator(".branch-grid").first.inner_text(), eng
-        page.wait_for_timeout(500)
+            assert eng not in page.locator(".branch-grid").inner_text(), eng
+        for w, h in [(1440, 900), (1366, 768)]:                              # ноутбук: возраст и графики в первом экране
+            page.set_viewport_size({"width": w, "height": h})
+            bottom = page.evaluate("Math.max(...[...document.querySelectorAll('.charts-grid .dv-card, .age-summary')]"
+                                   ".map(e => e.getBoundingClientRect().bottom))")
+            assert bottom <= h, f"{w}×{h}: инфографика заканчивается на {bottom:.0f}px"
+        page.set_viewport_size({"width": 1440, "height": 900})
+        page.wait_for_timeout(300)
         page.screenshot(path=SHOTS / "calc_01_example.png", full_page=False)
-        step("пример 1: PhenoAge 50,1 (самостоятельно), LMB 58,6 с исследовательским статусом; без сравнения моделей")
+        step("пример 1: календарный 55, LMB 58,6, разница +3,6; PhenoAge 50,1 отдельно; оба графика видны сразу и помещаются в первый экран ноутбука; служебных надписей нет")
 
-        research = page.locator(".research-section")
-        expect(research).to_be_visible()
-        expect(research.locator("section[aria-labelledby=dv-branches] .dv-row")).to_have_count(7)
-        expect(research.locator(".dev-grid .dev-row:not(.dev-head)")).to_have_count(12)
+        branches.get_by_role("button", name="Почечный").click()
+        parts = branches.locator(".dv-parts")
+        expect(parts.locator(".dv-part").filter(has_text="ACR")).to_contain_text("+1,01")
+        expect(parts.locator(".dv-part").filter(has_text="eGFR")).to_contain_text("+0,89")
+        deviation.get_by_role("button", name="eGFR: Z +1,4, неблагоприятнее").click()
+        expect(deviation.locator(".dev-detail")).to_contain_text("ожидаемое 100,2")
+        expect(deviation.locator(".dev-detail svg")).to_be_visible()
+        page.locator(".branch").filter(has_text="Сердечно-сосудистый профиль").get_by_label("Подробнее: SCORE2", exact=True).click()
+        expect(page.locator(".branch .info-body").first).to_contain_text("SCORE2 (ESC 2021)")
+        step("по нажатию: вклад системы по показателям (Почечный: ACR +1,01, eGFR +0,89), возрастной график показателя, формула индекса")
+
+        method = page.locator("#method")
+        method.locator("> summary").click()
+        expect(method).to_contain_text("Клиническая валидация не проведена")
+        expect(method).to_contain_text("целевая популяция модели не утверждена")
+        expect(method).to_contain_text("научный статус: не валидирована")
         page.get_by_role("switch", name="Проверочный расчёт Cardio").check()
-        check = research.locator(".check-body")
+        check = method.locator(".check-body")
         expect(check).to_contain_text("Популяционная нормализация и перевод в годы не подтверждены")
         expect(check.locator("tbody tr").filter(has_text="Вклад Cardio")).to_contain_text("+0,319")
         expect(check.locator("tbody tr").filter(has_text="LMB BioAge")).to_contain_text("57,19")
         expect(check).not_to_contain_text("PhenoAge")
+        page.get_by_role("switch", name="Проверочный расчёт Cardio").uncheck()
         page.screenshot(path=SHOTS / "calc_03_profile_full.png", full_page=True)
-        page.get_by_role("switch", name="Исследовательский режим").uncheck()
-        expect(page.locator(".research-section")).to_have_count(0)
+        page.get_by_role("switch", name="Расчётная оценка LMB и инфографика").uncheck()
+        expect(page.locator(".charts-grid")).to_have_count(0)
         expect(lmb.locator(".bio-value")).to_have_count(0)
-        expect(page.locator(".domain-line")).to_have_count(0)
-        expect(pheno.locator(".figure-value")).to_have_text("50,1")             # PhenoAge не зависит от режима
-        page.get_by_role("switch", name="Исследовательский режим").check()
-        step("исследовательский режим управляет всеми исследовательскими блоками; PhenoAge виден всегда")
+        expect(pheno.locator(".figure-value")).to_contain_text("50,1")      # PhenoAge не зависит от режима
+        page.get_by_role("switch", name="Расчётная оценка LMB и инфографика").check()
+        expect(branches.locator(".dv-row")).to_have_count(7)
+        method.locator("> summary").click()
+        step("«О методике»: статус, валидация, область, настройки режима и проверочный расчёт Cardio (+0,319; 57,19); PhenoAge виден всегда")
 
         tab("Данные")
         page.get_by_label("Лимфоциты абс.", exact=True).fill("8")
@@ -121,7 +148,7 @@ def run(base: str) -> None:
         expect(row("Лейкоциты")).to_have_class("calc-row has-error")
         tab("Результаты")
         expect(pheno).to_contain_text("не рассчитан")
-        expect(lmb).to_contain_text("не рассчитана")
+        expect(lmb).to_contain_text("не рассчитан")
         gaps = page.locator(".gaps-card")
         expect(gaps).to_contain_text("Общий анализ крови противоречив")
         page.screenshot(path=SHOTS / "calc_09_cbc_conflict.png", full_page=False)
@@ -143,12 +170,12 @@ def run(base: str) -> None:
         expect(src).to_contain_text("выберите источник")
         expect(src).to_contain_text("лаборатория 2,5 мг/ммоль")
         tab("Результаты")
-        expect(lmb).to_contain_text("не рассчитана")
+        expect(lmb).to_contain_text("не рассчитан")
         expect(page.locator(".gaps-card")).to_contain_text("Есть два значения ACR")
         tab("Данные")
         page.get_by_role("radio", name="Расчёт по альбумину и креатинину").click()
         tab("Результаты")
-        expect(lmb.locator(".bio-value")).to_have_text("58,6")
+        expect(lmb.locator(".bio-value")).to_contain_text("58,6")
         expect(page.locator(".branch").filter(has_text="Почечный профиль")).to_contain_text("источник: расчёт по альбумину и креатинину мочи")
         step("конфликт ACR требует выбора источника; источник указан в результатах")
 
@@ -205,7 +232,7 @@ def run(base: str) -> None:
         page.locator("input[type=file]").set_input_files(str(tmp))
         expect(page.locator(".alert")).to_contain_text("Открыт файл old-case.json")
         tab("Результаты")
-        expect(lmb.locator(".bio-value")).to_have_text("58,6")
+        expect(lmb.locator(".bio-value")).to_contain_text("58,6")
         step("файл сохраняется и открывается; старый файл с полями сравнения открывается, лишнее игнорируется")
 
         page.get_by_role("button", name="Сформировать отчёт").click()
@@ -216,6 +243,10 @@ def run(base: str) -> None:
         expect(report).to_contain_text("источник: расчёт по альбумину и креатинину мочи")
         expect(report).not_to_contain_text("LMB − PhenoAge")
         expect(report.locator(".cardio-check")).to_have_count(0)
+        expect(report.locator(".report-method")).to_contain_text("О методике")
+        rtext = report.inner_text()
+        assert rtext.count("Клиническая валидация не проведена") == 1, "методика в отчёте повторяется"
+        assert rtext.index("О методике") > rtext.index("Показатели по системам"), "методика — в конце отчёта"
         page.screenshot(path=SHOTS / "calc_07_report.png", full_page=True)
         page.emulate_media(media="print")
         expect(page.locator(".tabs")).to_be_hidden()
@@ -223,12 +254,12 @@ def run(base: str) -> None:
         page.pdf(path=str(SHOTS / "calc_report.pdf"), format="A4")
         page.emulate_media(media="screen")
         page.get_by_role("button", name="К результатам").click()
-        step("отчёт по кнопке: PhenoAge, оба риска FRAX (перенесены из официального), источник ACR; печать в PDF")
+        step("отчёт по кнопке: PhenoAge, оба риска FRAX (перенесены из официального), источник ACR; методика — одним блоком в конце; печать в PDF")
 
         example(2)
         tab("Результаты")
-        expect(pheno.locator(".figure-value")).to_have_text("38,1")
-        expect(lmb.locator(".bio-value")).to_have_text("46,9")
+        expect(pheno.locator(".figure-value")).to_contain_text("38,1")
+        expect(lmb.locator(".bio-value")).to_contain_text("46,9")
         page.screenshot(path=SHOTS / "calc_06_younger.png", full_page=False)
         step("пример 2: PhenoAge 38,1, LMB 46,9")
 
