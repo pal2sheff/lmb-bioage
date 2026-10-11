@@ -364,3 +364,25 @@ main { max-width: 1240px; margin: 0 auto; padding: 28px 32px 80px; }
 }
 @media print { .dv-card { break-inside: avoid; } }
 .dv-card, #profile { scroll-margin-top: 64px; }
+
+/* — исследовательский расчёт (режим тестирования, только врач) — */
+.research-toggle { display: flex; gap: 10px; align-items: flex-start; margin: -8px 0 16px; padding: 10px 14px;
+  border: 1px dashed var(--rule-strong); border-radius: 8px; cursor: pointer; font-size: 14px; }
+.research-toggle input { margin-top: 3px; width: 16px; height: 16px; accent-color: var(--accent); }
+.research { background: var(--card); border: 1px solid var(--review); border-radius: 10px; padding: 14px 18px 12px;
+  margin: 0 0 16px; }
+.research summary { cursor: pointer; display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap;
+  font: 600 17px/1.3 var(--serif); }
+.research-status { font: 600 11px/1 var(--sans); letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--review); border: 1px solid currentColor; border-radius: 4px; padding: 3px 6px; }
+.research-limits { margin: 10px 0 12px; padding: 8px 12px; border-left: 3px solid var(--review);
+  background: color-mix(in srgb, var(--review) 8%, var(--card)); font-size: 13.5px; }
+.research-body { display: grid; grid-template-columns: 220px 1fr; gap: 24px; align-items: start; }
+.research-figure { display: flex; flex-direction: column; gap: 6px; }
+.research-value { font: 600 40px/1 var(--serif); }
+.research-const, .research-sum { border-bottom: 0; }
+.research-sum { border-top: 1px solid var(--ink-2); }
+.research-meta { margin: 10px 0 0; }
+.traj-note { flex-basis: 100%; font-size: 12px; color: var(--muted); }
+@media (max-width: 760px) { .research-body { grid-template-columns: 1fr; gap: 12px; } }
+@media print { .research, .research-toggle { display: none !important; } }

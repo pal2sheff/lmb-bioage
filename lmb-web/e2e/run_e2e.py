@@ -222,13 +222,17 @@ def run_browser() -> None:
         expect(charts.locator(".dv-row").filter(has_text="Renal")).not_to_have_class("dv-row is-missing")
         expect(charts.locator(".dv-row.is-missing").filter(has_text="Brain")).to_contain_text("нет вклада")
         expect(page.locator(".traj").filter(has_text="eGFR")).to_have_count(1)
+        page.get_by_role("switch").check()                                   # режим тестирования (только врач)
+        expect(page.locator(".research")).to_contain_text("неприменим")      # 66 лет: вне области 40–64
+        expect(page.locator(".research")).to_contain_text("вне технической области тестирования 40–64")
+        expect(page.locator(".research .research-value")).to_have_count(0)
         page.get_by_text("Причины").click()
         expect(page.locator(".integral")).to_contain_text("целевая популяция модели не утверждена")
         page.get_by_role("button", name="Проверить воспроизводимость").click()
         expect(page.get_by_text("результат совпадает полностью")).to_be_visible()
         page.wait_for_timeout(800)  # дождаться анимации появления карточек
         page.screenshot(path=SHOTS / "06_profile.png", full_page=True)
-        step("профиль 9 веток, Z-оценки v0.3, графики вкладов и траекторий, итог заблокирован с причинами, расчёт воспроизводится")
+        step("профиль 9 веток, Z-оценки v0.3, графики вкладов и траекторий, исследовательский расчёт неприменим вне 40–64, итог заблокирован с причинами, расчёт воспроизводится")
 
         page.set_viewport_size({"width": 390, "height": 844})
         page.wait_for_timeout(300)

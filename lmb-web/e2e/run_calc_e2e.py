@@ -79,26 +79,42 @@ def run(base: str) -> None:
         expect(branches.locator(".dv-row")).to_have_count(7)
         met = branches.locator(".dv-row").filter(has_text="Metabolic")
         expect(met).to_contain_text("+0,54")  # 1,5 × 0,36
-        expect(branches.locator(".dv-row.is-missing").filter(has_text="Cardio")).to_contain_text("нет вклада")
+        expect(branches.locator(".dv-row.is-missing")).to_have_count(0)      # SCORE2 сверен — Cardio считается
         expect(branches).to_contain_text("не суммируются")
         drivers = page.locator("section[aria-labelledby=dv-drivers] .dv-row")
         assert drivers.count() >= 8, drivers.count()
         traj = page.locator(".traj")
         assert traj.count() >= 8, traj.count()
         expect(page.locator(".traj").filter(has_text="eGFR").locator(".traj-dot")).to_have_count(1)
-        assert page.locator(".traj").filter(has_text="SCORE2").count() == 0  # Cardio не активирован — траектории нет
+        expect(page.locator(".traj").filter(has_text="SCORE2")).to_contain_text("от авторского ожидания v0.3")
         page.locator("section[aria-labelledby=dv-branches]").scroll_into_view_if_needed()
         page.screenshot(path=SHOTS / "calc_03_charts.png", full_page=False)
         page.locator(".traj-section").scroll_into_view_if_needed()
         page.screenshot(path=SHOTS / "calc_04_trajectories.png", full_page=False)
         step("графики: вклад 7 систем (без суммы), вклад показателей, траектории с точкой пациента")
 
+        expect(page.locator(".research")).to_have_count(0)                   # по умолчанию выключено
+        page.get_by_role("switch").check()
+        research = page.locator(".research")
+        expect(research).to_contain_text("Исследовательский расчёт LMB v0.3")
+        expect(research).to_contain_text("Клиническая валидация не проведена")
+        expect(research).to_contain_text("возрастные ступени CAIDE")
+        expect(research.locator(".research-const")).to_contain_text("+0,08")
+        expect(research.locator(".dv-row")).to_have_count(9)                 # 7 доменов + постоянная + сумма
+        expect(research.locator(".research-value")).not_to_be_empty()
+        expect(page.locator(".integral")).to_contain_text("не рассчитан")    # клинический итог не появляется
+        research.scroll_into_view_if_needed()
+        page.screenshot(path=SHOTS / "calc_05_research.png", full_page=False)
+        step("переключатель режима тестирования: исследовательский итог, вклады 7 доменов, постоянная 0,08, ограничения")
+
         page.get_by_label("ЛПВП", exact=True).fill("abc")
         expect(page.get_by_role("status").filter(has_text="Проверьте ввод")).to_contain_text("ЛПВП: не число")
         page.get_by_label("ЛПВП", exact=True).fill("1,5")
         page.get_by_label("Инсулин натощак", exact=True).fill("")
         expect(metabolic.locator(".domain-line")).to_contain_text("не хватает")
-        step("ошибка ввода показана; пустой инсулин → Metabolic не считается (без подстановки)")
+        expect(page.locator(".research")).to_contain_text("не рассчитан")
+        expect(page.locator(".research")).to_contain_text("Metabolic: не хватает входов")
+        step("ошибка ввода показана; пустой инсулин → Metabolic и исследовательский итог не считаются (без подстановки)")
 
         page.get_by_label("Инсулин натощак", exact=True).fill("8")
         expect(metabolic.locator(".domain-line")).to_contain_text("0,36")

@@ -41,6 +41,27 @@
     "z_clip": 3.0
   },
   "target_population": null,
+  "reference_sample": null,
+  "research_mode": "local_synthetic",
+  "research_population": {
+    "status": "technical_test_area",
+    "description": "Технические тесты: синтетические профили мужчин и женщин 40–64 лет, Казахстан. Пересечение SCORE2 (40–69) и исходной выборки CAIDE (39–64). Не является референтной популяцией коэффициентов LMB; клиническая валидация не выполнена.",
+    "age_min": 40,
+    "age_max": 64,
+    "age_basis": "full_years",
+    "sexes": [
+      "female",
+      "male"
+    ],
+    "country": "Казахстан",
+    "score2_region": "high",
+    "source": "Решение владельца 11.10.2026 (LMB_Claude_Decisions, раздел 1)"
+  },
+  "research_limitations": [
+    "Исследовательская модель.",
+    "Клиническая валидация не проведена.",
+    "Нормализация Cardio требует проверки; Brain содержит возрастные ступени CAIDE."
+  ],
   "sex_coding": {
     "female": 0,
     "male": 1

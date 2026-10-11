@@ -1,7 +1,9 @@
 """Сверка SCORE2/SCORE2-OP с официальным калькулятором HeartScore ESC (Europe high risk).
 
-Набор: tests/fixtures/heartscore_check.csv — 30 синтетических случаев. Строка с пустым
-hs_result ещё не проверена и пропускается; значения за HeartScore не придумываются.
+Набор: tests/fixtures/heartscore_check.csv — 30 синтетических случаев HS01–HS30 владельца
+(20 SCORE2, 10 SCORE2-OP; LMB_Claude_Decisions, 11.10.2026). Прежние строки C с другими входами
+вынесены в score2_extra_inputs.csv без статуса официально сверенных. Строка с пустым hs_result
+пропускается; значения за HeartScore не придумываются.
 
 HeartScore принимает месяц и год рождения и считает непрерывный возраст на дату проверки.
 День рождения ему неизвестен, поэтому случай считается совпавшим, если при каком-либо дне
@@ -84,11 +86,32 @@ def test_hs04_requires_continuous_age():
     assert round(r, 1) != 8.8
 
 
+def _matches(row) -> bool:
+    res = parse_result(row["hs_result"])
+    if res is None:
+        return False
+    lo, hi = our_risk_range(row)
+    if res["comparator"] == "<":
+        return lo < res["bound_percent"]
+    if res["comparator"] == ">":
+        return hi > res["bound_percent"]
+    half = 0.5 * 10 ** -res["decimals"]
+    return lo < res["risk_percent"] + half and hi >= res["risk_percent"] - half
+
+
 def test_checklist_status_and_activation_rule():
+    """Каждый алгоритм активируется только после совпадения всех своих эталонов (20 и 10)."""
     assert len(ROWS) == REQUIRED
-    assert sum(r["model"] == "score2_op" for r in ROWS) == 10
-    done = [r for r in ROWS if r["hs_result"].strip()]
-    complete = len(done) == REQUIRED
-    for code in ("score2", "score2_op"):
+    assert [r["case"] for r in ROWS] == [f"HS{i:02d}" for i in range(1, 31)]
+    need = {"score2": 20, "score2_op": 10}
+    for code, n in need.items():
+        rows = [r for r in ROWS if r["model"] == code]
+        assert len(rows) == n
         if cardio.load_params(code)["verification"]["heartscore_verified"]:
-            assert complete, "алгоритм нельзя активировать, пока не проверены все 30 случаев"
+            assert all(_matches(r) for r in rows), f"{code}: активирован без полной сверки"
+
+
+def test_hs02_kept_as_bound():
+    """HS02 «<1%» хранится как верхняя граница, точное число ему не присваивается."""
+    hs02 = next(r for r in ROWS if r["case"] == "HS02")
+    assert parse_result(hs02["hs_result"])["risk_percent"] is None

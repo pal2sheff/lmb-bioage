@@ -1,4 +1,4 @@
-"""Конфигурация v0.3 с нормализацией (редакция 2), CAIDE через анкету, неизменность редакций."""
+"""Конфигурация v0.3 (редакция 3 — исследовательский режим), CAIDE через анкету, неизменность редакций."""
 from sqlalchemy import text
 
 from tests.conftest import PATIENT
@@ -40,34 +40,68 @@ def test_catalog_has_integer_item(world):
     assert items["physical_activity_caide"]["options"] == ["active", "inactive", "unknown"]
 
 
-def test_calculation_uses_revision_2_and_blocks_integral(world):
+def test_calculation_uses_revision_3_and_blocks_integral(world):
     d = world["doctor_a"]
     eid = visit(d)
     d.put(f"/encounters/{eid}/questionnaire", json={"answers": ANSWERS})
     run = d.post(f"/encounters/{eid}/calculations", json={}).json()
-    assert run["model_version"] == "v0.3" and run["model_revision"] == 2
+    assert run["model_version"] == "v0.3" and run["model_revision"] == 3
     res = run["result"]
     caide = next(i for i in res["indices"] if i["code"] == "caide")
     assert caide["status"] == "calculated" and caide["value"] == 4.0          # 55 лет → 4, остальное 0
     dom = {x["domain"]: x for x in res["domains"]}
     for name in ("metabolic", "renal", "hepatic", "inflammation", "brain"):
         assert dom[name]["status"] == "calculated", (name, dom[name])
-    assert dom["cardio"]["status"] == "model_not_configured"                 # SCORE2 не сверен полностью
+    assert dom["cardio"]["status"] == "calculated"                           # SCORE2 сверен 30/30 (11.10.2026)
     assert dom["bone"]["status"] != "calculated"                             # нет FRAX
     assert run["status"] == "blocked" and run["bioage_years"] is None
     assert any("target_population" in r for r in res["blocking_reasons"])
     assert res["zscores"]["acr"]["input"] == "acr" and res["zscores"]["egfr"]["z_raw"] is not None
+    # исследовательский расчёт хранится в результате, но без Bone не выполняется (пропуск не заменяется)
+    assert res["research"]["status"] == "blocked" and res["research"]["bioage_years"] is None
+    assert any(r.startswith("Домен bone") for r in res["research"]["reasons"])
 
 
 def test_model_versions_immutable_revisions(world, admin_engine):
     rows = world["owner_a"].get("/model-versions").json()
     v03 = [r for r in rows if r["label"] == "v0.3"]
-    assert [(r["revision"], r["state"]) for r in v03] == [(1, "archived"), (2, "draft")]
-    assert v03[1]["config_gaps"] == ["target_population"] and v03[1]["usage_permission"] == "none"
-    assert v03[1]["validation_status"] == "not_validated" and "11.10.2026" in v03[1]["source_note"]
+    assert [(r["revision"], r["state"]) for r in v03] == [(1, "archived"), (2, "archived"), (3, "draft")]
+    assert v03[1]["config_sha256"].startswith("eb079142")                  # редакция 2 заморожена снимком
+    assert v03[2]["config_gaps"] == ["target_population"] and v03[2]["usage_permission"] == "research_only"
+    assert v03[2]["validation_status"] == "not_validated" and "LMB_Claude_Decisions" in v03[2]["source_note"]
     with admin_engine.connect() as c:
         n = c.execute(text("select count(*) from model_version where label = 'v0.3'")).scalar()
-    assert n == 2
+    assert n == 3
+
+
+def test_active_revision_matches_engine_config():
+    """Изменение файла конфигурации движка требует новой редакции (миграции со снимком)."""
+    from pathlib import Path
+    from lmb_engine.model import config_path, config_sha256, load_config
+    snap = Path(__file__).resolve().parents[1] / "migrations" / "snapshots" / "model_v0.3_rev3.json"
+    assert config_sha256(load_config(str(snap))) == config_sha256(load_config(config_path("model_v0.3.json")))
+
+
+def test_research_with_manual_frax_and_patient_policy(world):
+    """С ручным FRAX все семь доменов есть: исследовательский итог считается, клинический — нет;
+    пациентская выдача по умолчанию исследовательского блока не содержит."""
+    from lmb_server.report_policy import patient_result
+    d = world["doctor_a"]
+    eid = visit(d)
+    d.put(f"/encounters/{eid}/questionnaire", json={"answers": ANSWERS})
+    r = d.post(f"/encounters/{eid}/frax-manual", json={
+        "frax_major_10y_pct": 6.5, "frax_hip_10y_pct": 1.0, "with_bmd": False, "calculated_on": "2026-10-10",
+        "national_model": "Kazakhstan", "source_note": "Синтетический тест: ручной ввод"})
+    assert r.status_code == 201, r.text
+    run = d.post(f"/encounters/{eid}/calculations", json={}).json()
+    res = run["result"]
+    assert run["status"] == "blocked" and run["bioage_years"] is None
+    rs = res["research"]
+    assert rs["status"] == "calculated", rs["reasons"]
+    assert rs["mode"] == "local_synthetic" and rs["model_config_sha256"] == run["model_config_sha256"]
+    assert abs(rs["bioage_years"] - (rs["delta_years"] + 55)) < 1e-9          # 1971-03-01 → 55 полных лет
+    assert "research" not in patient_result(res) and "research" in patient_result(res, include_research=True)
+    assert "research" in res                                               # исходный результат не изменён
 
 
 def test_old_run_reproducible_after_new_revision(world):

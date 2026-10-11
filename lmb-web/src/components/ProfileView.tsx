@@ -2,6 +2,7 @@ import { fmt } from "../api";
 import type { Catalog, DomainRes, IndexRes, Run, ZRes } from "../types";
 import { StatusBadge } from "./ui";
 import { BranchContributions, IndicatorDrivers, Trajectories } from "./Charts";
+import { ResearchBlock, ResearchToggle, useResearchMode } from "./Research";
 import { unitRu } from "../units";
 
 /** Результат расчётного модуля (pipeline.run) — одинаковый у сервера и браузерного калькулятора. */
@@ -35,15 +36,20 @@ export function ProfileView({ result, catalog }: { result: EngineResult; catalog
   catalog.observation_groups.forEach((g) => g.items.forEach((d) => (names[d.code] = d.name_ru)));
   catalog.questionnaire_groups.forEach((g) => g.items.forEach((q) => (names[q.code] = q.name)));
   const doms = new Map(result.domains.map((d) => [d.domain, d]));
+  const [research, setResearch] = useResearchMode();
+  const researchTotal = research && result.research?.status === "calculated";
   return (
     <>
       <Integral result={result} />
+      {result.research && <ResearchToggle on={research} onChange={setResearch} />}
+      {research && result.research && <ResearchBlock r={result.research} catalog={catalog} />}
       <div className="dv-stack">
         <BranchContributions
           domains={result.domains}
           catalog={catalog}
           intercept={result.intercept}
           total={result.status === "calculated" && result.bioage_years !== null}
+          research={researchTotal}
         />
         <IndicatorDrivers domains={result.domains} catalog={catalog} />
       </div>
@@ -111,6 +117,19 @@ export function ProfileView({ result, catalog }: { result: EngineResult; catalog
             {res.extra.with_bmd ? "с МПК" : "без МПК"} · {res.extra.source === "manual" ? "ручной ввод" : "автоматически"}
           </p>
         )}
+        {code === "caide" && res.status === "calculated" && res.extra.age_band ? (
+          <p className="small">
+            возрастная категория CAIDE: {(res.extra.age_band as { label: string }).label} (
+            {(res.extra.age_band as { points: number }).points} балла) · балл возраста меняется ступенчато в 47 и 54
+            года — при сравнении визитов через эти границы Brain меняется без изменения здоровья
+          </p>
+        ) : null}
+        {(code === "score2" || code === "score2_op") && res.status === "calculated" && (
+          <p className="small">
+            категория сердечно-сосудистого риска определяется по самому {code === "score2" ? "SCORE2" : "SCORE2-OP"}{" "}
+            (регион high), а не по Z LMB
+          </p>
+        )}
         {code === "acr" && res.status === "calculated" && (
           <p className="small">
             <span className="num">{fmt(res.extra.acr_mg_g as number, 1)}</span> мг/г
@@ -146,7 +165,13 @@ function ZLine({ domain, zs }: { domain: DomainRes; zs: Record<string, ZRes> }) 
         return (
           <span key={c}>
             {i > 0 && " · "}
-            Z {Z_LABEL[c] ?? c}{" "}
+            {c === "score2" ? (
+              <span title="Отклонение SCORE2 от авторского ожидания модели v0.3 (нормализация требует проверки); не категория риска">
+                Z SCORE2 от ожидания v0.3
+              </span>
+            ) : (
+              <>Z {Z_LABEL[c] ?? c}</>
+            )}{" "}
             {z.z_raw === null ? (
               <span className="muted">—</span>
             ) : (

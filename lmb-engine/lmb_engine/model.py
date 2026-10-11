@@ -343,6 +343,68 @@ def integral(domains: Mapping[str, DomainResult], config: Mapping, calendar_age:
     return IntegralResult("calculated", intercept, contributions, delta, calendar_age + delta)
 
 
+RESEARCH_MODES = ("local_synthetic",)
+# Пробелы конфигурации, которые исследовательский расчёт не требует закрывать (решение владельца
+# 11.10.2026): клиническая целевая популяция не утверждена, но арифметика v0.3 воспроизводится.
+RESEARCH_TOLERATED_GAPS = ("target_population",)
+
+
+def research_integral(domains: Mapping[str, DomainResult], config: Mapping, calendar_age: Optional[int],
+                      check: Optional[ConfigCheck] = None) -> dict:
+    """Исследовательский расчёт неизменённой модели v0.3 (локальный тестовый режим).
+
+    Отличие от клинического итога одно: отсутствие target_population не блокирует расчёт.
+    Остальные условия те же — допустимая конфигурация, все параметры нормализации и правила,
+    все семь доменов рассчитаны (пропуски не заменяются, веса не перераспределяются), — плюс
+    возраст в технической области research_population. Результат не клинический.
+    """
+    integ = config["integral"]
+    check = check or check_config(config)
+    mode = config.get("research_mode")
+    pop = config.get("research_population") or {}
+    out = {"status": "blocked", "mode": mode, "model_version": config.get("version"),
+           "model_config_sha256": config_sha256(config),
+           "scientific_status": config.get("scientific_status", "not_validated"),
+           "target_population": config.get("target_population"),
+           "reference_sample": config.get("reference_sample"),
+           "research_population": pop or None,
+           "intercept": integ.get("intercept"), "contributions": None, "domain_scores": None,
+           "delta_years": None, "bioage_years": None,
+           "limitations": list(config.get("research_limitations") or []), "reasons": []}
+    reasons = out["reasons"]
+    if mode not in RESEARCH_MODES:
+        out["status"] = "model_not_configured"
+        reasons.append("Исследовательский режим не задан в конфигурации модели")
+        return out
+    if not check.valid:
+        reasons += [f"Конфигурация недопустима: {e}" for e in check.errors]
+    gaps = [g for g in check.gaps if g not in RESEARCH_TOLERATED_GAPS]
+    if gaps:
+        reasons.append("Конфигурация модели неполная: " + ", ".join(gaps))
+    if calendar_age is None:
+        reasons.append("Нет календарного возраста")
+    lo, hi = pop.get("age_min"), pop.get("age_max")
+    if lo is None or hi is None:
+        reasons.append("Техническая область тестирования (research_population) не задана")
+    elif calendar_age is not None and not lo <= calendar_age <= hi:
+        out["status"] = "not_applicable"
+        reasons.append(f"Возраст {calendar_age} вне технической области тестирования {lo}–{hi} лет")
+    for d in integ["required_domains"]:
+        r = domains.get(d)
+        if r is None or r.status != Status.CALCULATED or r.score is None:
+            reasons.append(f"Домен {d}: {r.status.value if r else 'нет результата'}")
+    if reasons:
+        if out["status"] == "blocked" and any(r.startswith("Возраст") for r in reasons):
+            out["status"] = "not_applicable"
+        return out
+    weights = {d: integ["weights"][d] for d in integ["required_domains"]}
+    scores = {d: domains[d].score for d in weights}
+    contributions, delta = combine(scores, weights, integ["intercept"])
+    out.update(status="calculated", contributions=contributions, domain_scores=scores,
+               delta_years=delta, bioage_years=calendar_age + delta)
+    return out
+
+
 def default_v03_config() -> dict:
     """Конфигурация v0.3 в текущем виде: веса заданы, параметры нормализации отсутствуют."""
     return copy.deepcopy({
