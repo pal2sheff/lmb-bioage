@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "lmb-engine"
 version = "0.4.0"
@@ -11,3 +15,6 @@ test = ["pytest>=7", "pytest-cov>=4"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.setuptools]
+packages = ["lmb_engine"]
