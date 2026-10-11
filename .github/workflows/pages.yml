@@ -1,0 +1,59 @@
+name: Калькулятор в браузере (GitHub Pages)
+
+# Собирает статический калькулятор (lmb-web/dist-calc: lmb_engine в Pyodide) и публикует
+# его на GitHub Pages. Публикация сработает после включения Pages в настройках репозитория
+# (Settings → Pages → Source: GitHub Actions). До этого сборка проходит, публикация
+# пропускается без ошибки, а готовый сайт доступен как артефакт запуска.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: lmb-web/package-lock.json
+      - name: Сборка калькулятора
+        working-directory: lmb-web
+        run: |
+          npm ci --no-audit --no-fund
+          python scripts/export_engine_bundle.py
+          npm run calc:build
+      - name: Сайт как артефакт (можно скачать из запуска)
+        uses: actions/upload-artifact@v4
+        with:
+          name: lmb-bioage-calc
+          path: lmb-web/dist-calc/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: lmb-web/dist-calc
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    continue-on-error: true      # Pages ещё не включены — не считаем ошибкой
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
