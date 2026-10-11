@@ -190,22 +190,20 @@ export function CalcApp() {
       .catch((e: unknown) => setLoadErr(e instanceof Error ? e.message : String(e)));
   }, []);
 
-  // черновик: сохраняется в этом браузере при каждом изменении (восстанавливается после обновления страницы)
+  // черновик: сохраняется в этом браузере сразу при каждом изменении (небольшой JSON; без задержки, чтобы
+  // обновление страницы сразу после ввода не теряло последние изменения)
   useEffect(() => {
     if (first.current) {
       first.current = false;
       return;
     }
-    const t = setTimeout(() => {
-      try {
-        const saved_at = new Date().toISOString();
-        window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ saved_at, form }));
-        setDraft(`Черновик сохранён в браузере · ${timeRu(saved_at)}`);
-      } catch {
-        setDraft("Черновик не сохраняется: хранилище браузера недоступно — сохраните случай в файл");
-      }
-    }, 400);
-    return () => clearTimeout(t);
+    try {
+      const saved_at = new Date().toISOString();
+      window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ saved_at, form }));
+      setDraft(`Черновик сохранён в браузере · ${timeRu(saved_at)}`);
+    } catch {
+      setDraft("Черновик не сохраняется: хранилище браузера недоступно — сохраните случай в файл");
+    }
   }, [form]);
 
   // пересчёт при каждом изменении (модуль работает локально, расчёт занимает миллисекунды)

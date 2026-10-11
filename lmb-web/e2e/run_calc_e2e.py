@@ -179,8 +179,11 @@ def run(base: str) -> None:
         expect(page.get_by_label("Производитель денситометра (для МПК в г/см²)")).to_have_count(0)
         step(f"анкета: счётчик {counter} учитывает только применимые вопросы")
 
+        tab("Данные")
+        page.get_by_label("Окружность талии", exact=True).fill("82")             # изменение прямо перед обновлением
         page.reload()
         expect(page.get_by_label("ACR лаборатории", exact=True)).to_have_value("2,5", timeout=60000)
+        expect(page.get_by_role("radio", name="Расчёт по альбумину и креатинину")).to_have_attribute("aria-checked", "true")
         expect(page.locator(".draft-status")).to_contain_text("Черновик сохранён")
         expect(page.locator(".alert")).to_contain_text("Восстановлен черновик")
         step("обновление страницы восстанавливает черновик; статус сохранения виден")
