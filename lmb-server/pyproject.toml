@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lmb-server"
+version = "0.5.0"
+description = "Серверная часть LMB BioAge: база, роли, API ручного ввода и расчёта"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.110", "sqlalchemy>=2.0", "psycopg[binary]>=3.1", "alembic>=1.13",
+  "argon2-cffi>=23", "cryptography>=42", "pyotp>=2.9", "uvicorn>=0.29", "httpx>=0.27",
+  "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7", "pytest-cov>=4", "httpx>=0.27"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "../lmb-engine"]
+
+[tool.setuptools.packages.find]
+include = ["lmb_server*"]

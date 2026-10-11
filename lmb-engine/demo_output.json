@@ -1,0 +1,461 @@
+{
+  "input_version": "sha256:d116bd2ccbbe4ff9e017f7aa3972b14a864e2e3c9f9767b651e22c113a9906a6",
+  "model_version": "v0.3",
+  "model_config_sha256": "eb079142a52dc8d2f0f1f97c989317428eb89ee231dc9f2a13cbc3227c318a72",
+  "engine_version": "0.4.0",
+  "status": "blocked",
+  "indices": [
+    {
+      "code": "bmi",
+      "version": 1,
+      "status": "calculated",
+      "value": 26.511804065143288,
+      "unit": "kg/m2",
+      "extra": {},
+      "warnings": [],
+      "missing_fields": [],
+      "reasons": []
+    },
+    {
+      "code": "whtr",
+      "version": 1,
+      "status": "calculated",
+      "value": 0.5280898876404494,
+      "unit": "ratio",
+      "extra": {},
+      "warnings": [],
+      "missing_fields": [],
+      "reasons": []
+    },
+    {
+      "code": "asmi",
+      "version": 1,
+      "status": "missing_data",
+      "value": null,
+      "unit": null,
+      "extra": {},
+      "warnings": [],
+      "missing_fields": [
+        "visbody_asm"
+      ],
+      "reasons": []
+    },
+    {
+      "code": "homa_ir",
+      "version": 1,
+      "status": "calculated",
+      "value": 2.787555555555555,
+      "unit": "ratio",
+      "extra": {},
+      "warnings": [],
+      "missing_fields": [],
+      "reasons": []
+    },
+    {
+      "code": "tyg",
+      "version": 1,
+      "status": "calculated",
+      "value": 8.992581640083513,
+      "unit": "ratio",
+      "extra": {},
+      "warnings": [],
+      "missing_fields": [],
+      "reasons": []
+    },
+    {
+      "code": "aip",
+      "version": 1,
+      "status": "calculated",
+      "value": 0.21387981994508098,
+      "unit": "ratio",
+      "extra": {},
+      "warnings": [],
+      "missing_fields": [],
+      "reasons": []
+    },
+    {
+      "code": "non_hdl",
+      "version": 1,
+      "status": "calculated",
+      "value": 4.800000000000001,
+      "unit": "mmol/L",
+      "extra": {},
+      "warnings": [],
+      "missing_fields": [],
+      "reasons": []
+    },
+    {
+      "code": "egfr_ckdepi_cr_2021",
+      "version": 1,
+      "status": "calculated",
+      "value": 86.32255499343395,
+      "unit": "mL/min/1.73m2",
+      "extra": {
+        "scr_mg_dl": 1.0407239819004523
+      },
+      "warnings": [],
+      "missing_fields": [],
+      "reasons": []
+    },
+    {
+      "code": "acr",
+      "version": 1,
+      "status": "calculated",
+      "value": 1.263157894736842,
+      "unit": "mg/mmol",
+      "extra": {
+        "acr_mg_g": 11.166315789473684
+      },
+      "warnings": [],
+      "missing_fields": [],
+      "reasons": []
+    },
+    {
+      "code": "fib4",
+      "version": 1,
+      "status": "calculated",
+      "value": 1.0700387781606262,
+      "unit": "ratio",
+      "extra": {},
+      "warnings": [],
+      "missing_fields": [],
+      "reasons": []
+    },
+    {
+      "code": "nlr",
+      "version": 1,
+      "status": "calculated",
+      "value": 1.8095238095238093,
+      "unit": "ratio",
+      "extra": {},
+      "warnings": [],
+      "missing_fields": [],
+      "reasons": []
+    },
+    {
+      "code": "sii",
+      "version": 1,
+      "status": "calculated",
+      "value": 416.19047619047615,
+      "unit": "10^9/L",
+      "extra": {},
+      "warnings": [],
+      "missing_fields": [],
+      "reasons": []
+    },
+    {
+      "code": "score2",
+      "version": 1,
+      "status": "missing_data",
+      "value": null,
+      "unit": null,
+      "extra": {},
+      "warnings": [],
+      "missing_fields": [
+        "sbp_mmhg",
+        "smoking_current"
+      ],
+      "reasons": [
+        "Установленное атеросклеротическое ССЗ: неизвестно",
+        "Хроническая болезнь почек: неизвестно",
+        "Семейная гиперхолестеринемия: неизвестно",
+        "Очень высокий отдельный фактор риска по оценке врача: неизвестно"
+      ]
+    },
+    {
+      "code": "score2_op",
+      "version": 1,
+      "status": "missing_data",
+      "value": null,
+      "unit": null,
+      "extra": {},
+      "warnings": [],
+      "missing_fields": [
+        "sbp_mmhg",
+        "smoking_current"
+      ],
+      "reasons": [
+        "Установленное атеросклеротическое ССЗ: неизвестно",
+        "Хроническая болезнь почек: неизвестно",
+        "Семейная гиперхолестеринемия: неизвестно",
+        "Очень высокий отдельный фактор риска по оценке врача: неизвестно",
+        "Возраст 52 вне диапазона SCORE2-OP (70–89 лет)"
+      ]
+    },
+    {
+      "code": "caide",
+      "version": 1,
+      "status": "missing_data",
+      "value": null,
+      "unit": null,
+      "extra": {},
+      "warnings": [],
+      "missing_fields": [
+        "sbp_mmhg",
+        "education_years",
+        "physical_activity_caide"
+      ],
+      "reasons": []
+    },
+    {
+      "code": "frax_kz",
+      "version": 1,
+      "status": "missing_data",
+      "value": null,
+      "unit": null,
+      "extra": {},
+      "warnings": [],
+      "missing_fields": [
+        "frax_result"
+      ],
+      "reasons": []
+    }
+  ],
+  "zscores": {
+    "score2": {
+      "status": "missing_data",
+      "input": "score2",
+      "t": null,
+      "expected": null,
+      "z_raw": null,
+      "z_clipped": null,
+      "reasons": [
+        "score2: Установленное атеросклеротическое ССЗ: неизвестно",
+        "score2: Хроническая болезнь почек: неизвестно",
+        "score2: Семейная гиперхолестеринемия: неизвестно",
+        "score2: Очень высокий отдельный фактор риска по оценке врача: неизвестно"
+      ]
+    },
+    "egfr": {
+      "status": "calculated",
+      "input": "egfr_ckdepi_cr_2021",
+      "t": 86.32255499343395,
+      "expected": 101.778985,
+      "z_raw": 1.7386451281232034,
+      "z_clipped": 1.7386451281232034,
+      "reasons": []
+    },
+    "acr": {
+      "status": "calculated",
+      "input": "acr",
+      "t": 2.4986711322831368,
+      "expected": 1.8982110000000003,
+      "z_raw": 0.8928403461017778,
+      "z_clipped": 0.8928403461017778,
+      "reasons": []
+    },
+    "fib4": {
+      "status": "calculated",
+      "input": "fib4",
+      "t": 0.7275673405127401,
+      "expected": 0.60476,
+      "z_raw": 0.5947259509367832,
+      "z_clipped": 0.5947259509367832,
+      "reasons": []
+    },
+    "homa_ir": {
+      "status": "calculated",
+      "input": "homa_ir",
+      "t": 1.3317208388613915,
+      "expected": 0.888419,
+      "z_raw": 1.3163223858842352,
+      "z_clipped": 1.3163223858842352,
+      "reasons": []
+    },
+    "tyg": {
+      "status": "calculated",
+      "input": "tyg",
+      "t": 8.992581640083513,
+      "expected": 8.293213999999999,
+      "z_raw": 2.1518209791746576,
+      "z_clipped": 2.1518209791746576,
+      "reasons": []
+    },
+    "aip": {
+      "status": "calculated",
+      "input": "aip",
+      "t": 0.21387981994508098,
+      "expected": -0.073968,
+      "z_raw": 1.0706911466732667,
+      "z_clipped": 1.0706911466732667,
+      "reasons": []
+    },
+    "whtr": {
+      "status": "calculated",
+      "input": "whtr",
+      "t": 0.5280898876404494,
+      "expected": 0.48461799999999994,
+      "z_raw": 0.8841679915481818,
+      "z_clipped": 0.8841679915481818,
+      "reasons": []
+    },
+    "nlr": {
+      "status": "calculated",
+      "input": "nlr",
+      "t": 1.0330150061822962,
+      "expected": 0.9955449999999999,
+      "z_raw": 0.15583478347534527,
+      "z_clipped": 0.15583478347534527,
+      "reasons": []
+    },
+    "sii": {
+      "status": "calculated",
+      "input": "sii",
+      "t": 6.033542894942941,
+      "expected": 6.1092,
+      "z_raw": -0.17150633722042918,
+      "z_clipped": -0.17150633722042918,
+      "reasons": []
+    },
+    "caide": {
+      "status": "missing_data",
+      "input": "caide",
+      "t": null,
+      "expected": null,
+      "z_raw": null,
+      "z_clipped": null,
+      "reasons": [
+        "caide: missing_data"
+      ]
+    },
+    "frax_major": {
+      "status": "missing_data",
+      "input": "frax_kz",
+      "t": null,
+      "expected": null,
+      "z_raw": null,
+      "z_clipped": null,
+      "reasons": [
+        "frax_kz: missing_data"
+      ]
+    }
+  },
+  "domains": [
+    {
+      "domain": "cardio",
+      "score": null,
+      "inputs": {},
+      "coefficient": null,
+      "contribution": null,
+      "status": "missing_data",
+      "reasons": [
+        "score2: score2: Установленное атеросклеротическое ССЗ: неизвестно; score2: Хроническая болезнь почек: неизвестно; score2: Семейная гиперхолестеринемия: неизвестно; score2: Очень высокий отдельный фактор риска по оценке врача: неизвестно"
+      ]
+    },
+    {
+      "domain": "metabolic",
+      "score": 1.3557506258200853,
+      "inputs": {
+        "homa_ir": 1.3163223858842352,
+        "tyg": 2.1518209791746576,
+        "aip": 1.0706911466732667,
+        "whtr": 0.8841679915481818
+      },
+      "coefficient": null,
+      "contribution": null,
+      "status": "calculated",
+      "reasons": []
+    },
+    {
+      "domain": "renal",
+      "score": 1.3157427371124906,
+      "inputs": {
+        "egfr": 1.7386451281232034,
+        "acr": 0.8928403461017778
+      },
+      "coefficient": null,
+      "contribution": null,
+      "status": "calculated",
+      "reasons": []
+    },
+    {
+      "domain": "hepatic",
+      "score": 0.5947259509367832,
+      "inputs": {
+        "fib4": 0.5947259509367832
+      },
+      "coefficient": null,
+      "contribution": null,
+      "status": "calculated",
+      "reasons": []
+    },
+    {
+      "domain": "inflammation",
+      "score": -0.007835776872541958,
+      "inputs": {
+        "nlr": 0.15583478347534527,
+        "sii": -0.17150633722042918
+      },
+      "coefficient": null,
+      "contribution": null,
+      "status": "calculated",
+      "reasons": []
+    },
+    {
+      "domain": "brain",
+      "score": null,
+      "inputs": {},
+      "coefficient": null,
+      "contribution": null,
+      "status": "missing_data",
+      "reasons": [
+        "caide: caide: missing_data"
+      ]
+    },
+    {
+      "domain": "bone",
+      "score": null,
+      "inputs": {},
+      "coefficient": null,
+      "contribution": null,
+      "status": "missing_data",
+      "reasons": [
+        "frax_major: frax_kz: missing_data"
+      ]
+    },
+    {
+      "domain": "muscle",
+      "score": null,
+      "inputs": {},
+      "coefficient": null,
+      "contribution": null,
+      "status": "not_included",
+      "reasons": [
+        "Не включено в эту версию модели"
+      ]
+    },
+    {
+      "domain": "adaptive",
+      "score": null,
+      "inputs": {},
+      "coefficient": null,
+      "contribution": null,
+      "status": "not_included",
+      "reasons": [
+        "Не включено в эту версию модели"
+      ]
+    }
+  ],
+  "contributions": null,
+  "intercept": 0.08,
+  "delta_years": null,
+  "bioage_years": null,
+  "warnings": [
+    "model_config_incomplete"
+  ],
+  "missing_fields": [
+    "education_years",
+    "frax_result",
+    "physical_activity_caide",
+    "sbp_mmhg",
+    "smoking_current",
+    "target_population",
+    "visbody_asm"
+  ],
+  "blocking_reasons": [
+    "Конфигурация модели неполная: target_population",
+    "Домен cardio: missing_data",
+    "Домен brain: missing_data",
+    "Домен bone: missing_data"
+  ]
+}

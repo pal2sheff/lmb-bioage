@@ -1,0 +1,34 @@
+{
+  "code": "score2_op",
+  "version": 1,
+  "title": "SCORE2-OP: 10-летний риск сердечно-сосудистых событий у лиц 70 лет и старше",
+  "age_range": [70, 89],
+  "region": "high",
+  "region_basis": "HeartScore ESC, European Risk Regions: Kazakhstan — high risk (проверено 10.10.2026)",
+  "centering": {"age": [73, 1], "sbp": [150, 1], "tc": [6, 1], "hdl": [1.4, 1]},
+  "baseline_survival": {"male": 0.7576, "female": 0.8082},
+  "mean_linear_predictor": {"male": 0.0929, "female": 0.229},
+  "coefficients": {
+    "male":   {"cage": 0.0634, "smoking": 0.3524, "csbp": 0.0094, "ctchol": 0.0850, "chdl": -0.3564,
+               "smoking_cage": -0.0247, "csbp_cage": -0.0005, "ctchol_cage": 0.0073, "chdl_cage": 0.0091},
+    "female": {"cage": 0.0789, "smoking": 0.4921, "csbp": 0.0102, "ctchol": 0.0605, "chdl": -0.3040,
+               "smoking_cage": -0.0255, "csbp_cage": -0.0004, "ctchol_cage": -0.0009, "chdl_cage": 0.0154}
+  },
+  "calibration": {
+    "male":   {"low": [-0.34, 1.19], "moderate": [0.01, 1.25], "high": [0.08, 1.15], "very_high": [0.05, 0.7]},
+    "female": {"low": [-0.52, 1.01], "moderate": [-0.1, 1.1], "high": [0.38, 1.09], "very_high": [0.38, 0.69]}
+  },
+  "diabetes_terms": "Не используются: в ветке Cardio SCORE2-OP применяется только без сахарного диабета",
+  "sources": [
+    "SCORE2-OP working group, ESC Cardiovascular Risk Collaboration. Eur Heart J 2021. doi:10.1093/eurheartj/ehab312",
+    "RiskScorescvd 0.3.1 (CRAN), R/11_SCORE2_func.R — совпадение всех значений",
+    "cvd-risk 0.1.48 (PyPI, PyCVDRisk), models/score2op/score2op.py — совпадение всех значений",
+    "MetricGate, SCORE2-OP: базовая выживаемость 0,7576/0,8082 и средний линейный предиктор 0,0929/0,229; пример 75 лет, мужчина, САД 150, ОХС 5,5, ЛПВП 1,3, регион moderate — 18,8 %"
+  ],
+  "verification": {
+    "constants_cross_checked": true,
+    "constants_cross_check_note": "Значения совпадают в двух открытых реализациях; пример MetricGate воспроизводится (18,79 %)",
+    "heartscore_verified": false,
+    "heartscore_note": "Активация после сверки не менее 10 синтетических случаев с HeartScore (регион high), допуск ±0,1 п. п."
+  }
+}
