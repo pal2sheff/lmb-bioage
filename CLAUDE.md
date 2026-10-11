@@ -32,7 +32,7 @@
 ```
 lmb-engine/   расчётный модуль на чистом Python (0.4.0): индексы, CAIDE, применимость, Z-оценки, домены, v0.3
 lmb-server/   FastAPI + PostgreSQL 16 (0.5.0): роли, RLS, аудит, наблюдения, анкета, снимки, расчёты, FRAX, файлы
-lmb-web/      React 19 + TypeScript + Vite 8 (0.3.1): кабинет врача; e2e на Playwright (Python)
+lmb-web/      React 19 + TypeScript + Vite 8 (0.4.0): кабинет врача и браузерный калькулятор (calc/); e2e на Playwright (Python)
 docs/         ТЗ v1.0, контекст владельца, пакет параметров LMB_Claude_Data_1, сопоставление LQ One и Visbody
 local/        тестовый режим на одном компьютере (Windows): install.bat/ps1, start/stop/backup.bat, lmb_local.py
 ```
@@ -46,6 +46,7 @@ local/        тестовый режим на одном компьютере (
 - `lmb-server/lmb_server/storage.py` — файлы только на диске сервера, шифрование Fernet.
 - `lmb-server/lmb_server/catalog.py` — справочник показателей и анкеты; `engine_bridge.py` — сборка снимка для движка.
 - `lmb-server/migrations/versions/` — 0001–0006 (0006 — шифрование ФИО с переносом существующих карточек). Версия модели в базе хранится неизменяемыми редакциями (`label` + `revision`); изменение конфигурации = новая редакция через миграцию, прежняя → `archived`. Новые таблицы с данными клиники требуют RLS (`ENABLE`/`FORCE`, политика по `lmb.clinic_id`) и явных `GRANT` для `lmb_app`; см. 0003 и 0004.
+- `lmb-web/calc/`, `lmb-web/src/calc/` — браузерный калькулятор (решение владельца 11.10.2026: тестовый режим в браузере, «как МИТОпаспорт»): статический сайт, `lmb_engine` и `config/` выполняются в Pyodide без изменений (`scripts/export_engine_bundle.py` копирует файлы, `src/calc/bridge.py` — вход/выход JSON). Формулы в TypeScript не дублировать. Данные не покидают браузер (сохранение — в файл). Отображение профиля общее с кабинетом врача: `src/components/ProfileView.tsx`. Публикация — `.github/workflows/pages.yml` (GitHub Pages; нужно включить Pages в настройках).
 - `local/lmb_local.py` — запуск без Docker: своя база PostgreSQL в `%LOCALAPPDATA%\LMB-BioAge` (trust, только 127.0.0.1), ключи в `secrets.env` там же, сайт на 127.0.0.1:8000, TOTP выключен (`LMB_REQUIRE_STAFF_TOTP=false`), FRAX — ручной ввод. CI проверяет этот запуск на windows-latest.
 
 ## Архитектурные правила
@@ -71,7 +72,7 @@ cd lmb-server && pip install -e ".[test]" && python3 -m pytest -q
 cd lmb-web && npm install && npm run build && pip install playwright && python3 e2e/run_e2e.py
 ```
 
-Состояние на 11.10.2026: движок — 199 тестов пройдено, 26 пропущено (непроверенные случаи HeartScore); сервер — 109 тестов; e2e — 13 шагов. 11.10.2026 один прогон серверных тестов из 12 завершился одной ошибкой, которая не повторилась (вероятно, нестабильный тест); при повторении запустить `pytest -rf` и зафиксировать имя теста. Под root кластер PostgreSQL запускается от пользователя `postgres` в `/var/tmp`. Для ускорения тестов `LMB_ARGON2_PROFILE=test` (только в тестах).
+Состояние на 11.10.2026: движок — 199 тестов пройдено, 26 пропущено (непроверенные случаи HeartScore); сервер — 109 тестов; e2e кабинета — 13 шагов; e2e браузерного калькулятора — 6 шагов (`npm run calc:bundle && npm run calc:build && python3 e2e/run_calc_e2e.py`). 11.10.2026 один прогон серверных тестов из 12 завершился одной ошибкой, которая не повторилась (вероятно, нестабильный тест); при повторении запустить `pytest -rf` и зафиксировать имя теста. Под root кластер PostgreSQL запускается от пользователя `postgres` в `/var/tmp`. Для ускорения тестов `LMB_ARGON2_PROFILE=test` (только в тестах).
 
 Миграция: изменить модели → `alembic revision --autogenerate --rev-id 000N` при поднятой базе (см. `tests/pgcluster.py`) → дописать RLS и GRANT вручную → проверить `alembic downgrade` и `alembic check`.
 

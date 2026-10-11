@@ -1,12 +1,15 @@
 {
   "name": "lmb-web",
   "private": true,
-  "version": "0.3.1",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "typecheck": "tsc -b"
+    "typecheck": "tsc -b",
+    "calc:bundle": "python3 scripts/export_engine_bundle.py",
+    "calc:dev": "vite --config vite.calc.config.ts",
+    "calc:build": "tsc -b && vite build --config vite.calc.config.ts"
   },
   "dependencies": {
     "@fontsource/golos-text": "^5.3.0",
@@ -22,6 +25,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "pyodide": "0.29.4",
     "typescript": "~5.8.0",
     "vite": "^8.0.0"
   }

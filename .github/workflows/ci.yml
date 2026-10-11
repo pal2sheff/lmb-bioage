@@ -59,6 +59,12 @@ jobs:
       - name: Сквозная проверка в браузере
         working-directory: lmb-web
         run: python e2e/run_e2e.py
+      - name: Браузерный калькулятор — сборка и проверка
+        working-directory: lmb-web
+        run: |
+          python scripts/export_engine_bundle.py
+          npm run calc:build
+          python e2e/run_calc_e2e.py
       - name: Снимки экрана сквозной проверки
         if: always()
         uses: actions/upload-artifact@v4
