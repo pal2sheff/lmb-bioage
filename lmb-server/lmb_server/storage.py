@@ -65,7 +65,8 @@ class LocalEncryptedStorage:
         path = self._path(key)
         path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         tmp = path.with_suffix(".tmp")
-        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        # O_BINARY — только Windows: без него файл открывается в текстовом режиме
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0), 0o600)
         with os.fdopen(fd, "wb") as fh:
             fh.write(self.fernet.encrypt(data))
             fh.flush()

@@ -12,3 +12,4 @@ dist/
 *.lmbenc
 /files/
 lmb-web/e2e/screens/
+.venv/
