@@ -1,4 +1,4 @@
-// Синтетический пациент для знакомства с калькулятором. Данные выдуманы.
+// Синтетические пациенты для знакомства с калькулятором. Данные выдуманы.
 import type { FormState } from "./CalcApp";
 
 const v = (text: string, unit: string) => ({ text, unit });
@@ -25,6 +25,12 @@ export const EXAMPLE: FormState = {
     platelets: v("240", "10^9/L"),
     neutrophils_abs: v("3,5", "10^9/L"),
     lymphocytes_abs: v("2,0", "10^9/L"),
+    wbc: v("6,3", "10^9/L"),
+    mcv: v("91", "fL"),
+    rdw: v("13,4", "%"),
+    albumin_serum: v("44", "g/L"),
+    crp: v("1,8", "mg/L"),
+    alp: v("78", "U/L"),
   },
   flags: {
     fasting_status: "yes", creatinine_idms: "yes", acute_infection: "no", acute_kidney_change: "no",
@@ -34,4 +40,41 @@ export const EXAMPLE: FormState = {
     rheumatoid_arthritis: "no", secondary_osteoporosis: "no",
   },
   frax: { major: "6,5", hip: "1,0", with_bmd: "no" },
+};
+
+/** Пример 2: благоприятный профиль мужчины 50 лет — расчётный биологический возраст ниже паспортного. */
+export const EXAMPLE_YOUNGER: FormState = {
+  birth_date: "1976-05-14",
+  encounter_date: "2026-10-10",
+  sex: "male",
+  values: {
+    height_cm: v("178", "cm"),
+    weight_kg: v("72", "kg"),
+    waist_cm: v("80", "cm"),
+    sbp_mmhg: v("114", "mmHg"),
+    glucose_fasting: v("4,7", "mmol/L"),
+    insulin_fasting: v("4,5", "uU/mL"),
+    tg: v("0,8", "mmol/L"),
+    tc: v("4,6", "mmol/L"),
+    hdl: v("1,6", "mmol/L"),
+    creatinine_serum: v("78", "umol/L"),
+    u_albumin: v("5", "mg/L"),
+    u_creatinine: v("12", "mmol/L"),
+    ast: v("19", "U/L"),
+    alt: v("17", "U/L"),
+    platelets: v("260", "10^9/L"),
+    neutrophils_abs: v("2,6", "10^9/L"),
+    lymphocytes_abs: v("2,3", "10^9/L"),
+    wbc: v("5,6", "10^9/L"),
+    mcv: v("89", "fL"),
+    rdw: v("12,6", "%"),
+    albumin_serum: v("46", "g/L"),
+    crp: v("0,6", "mg/L"),
+    alp: v("58", "U/L"),
+  },
+  flags: {
+    ...EXAMPLE.flags,
+    education_years: "16",
+  },
+  frax: { major: "3,1", hip: "0,3", with_bmd: "no" },
 };

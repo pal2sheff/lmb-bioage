@@ -7,7 +7,10 @@
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import math
+from pathlib import Path
 
 from .core import Encounter, IndexResult, Sex, Status, Tri
 from .cardio import score2, score2_op
@@ -343,12 +346,74 @@ def frax_kz(enc: Encounter) -> IndexResult:
     return g.result(major, "%", extra)
 
 
+# ---------------------------------------------------------------- контроль: PhenoAge
+PHENOAGE_FILE = Path(__file__).resolve().parents[1] / "config" / "algorithms" / "phenoage_2018.json"
+PHENOAGE_INPUTS = ("albumin_serum", "creatinine_serum", "glucose_fasting", "crp", "lymphocytes_abs", "wbc",
+                   "mcv", "rdw", "alp")
+
+
+def load_phenoage_params() -> dict:
+    raw = PHENOAGE_FILE.read_bytes()
+    p = json.loads(raw.decode("utf-8"))
+    p["_sha256"] = hashlib.sha256(raw).hexdigest()
+    m = p["mortality"]
+    if abs(math.expm1(m["months"] * m["gamma"]) - m["factor"]) > 1e-5:
+        raise ValueError("phenoage: factor ≠ exp(months·gamma) − 1")
+    return p
+
+
+def phenoage_from(p: dict, albumin_gl: float, creatinine_umol: float, glucose_mmol: float, crp_mgl: float,
+                  lymph_pct: float, mcv: float, rdw: float, alp: float, wbc: float, age: float) -> dict:
+    """Формула Левин 2018 в редакции поправки PLoS Med 2019. CRP подаётся в мг/л и переводится в мг/дл."""
+    c = p["xb"]
+    xb = (c["intercept"] + c["albumin"] * albumin_gl + c["creatinine"] * creatinine_umol
+          + c["glucose"] * glucose_mmol + c["ln_crp"] * math.log(crp_mgl / 10) + c["lymphocyte_percent"] * lymph_pct
+          + c["mcv"] * mcv + c["rdw"] * rdw + c["alp"] * alp + c["wbc"] * wbc + c["age"] * age)
+    m = p["mortality"]
+    mort = 1 - math.exp(-m["factor"] * math.exp(xb) / m["gamma"])
+    k = p["conversion"]
+    age_out = k["intercept"] + math.log(k["ln_scale"] * math.log(1 - mort)) / k["divisor"]
+    return {"xb": xb, "mortality_10y": mort, "phenoage": age_out}
+
+
+def phenoage(enc: Encounter, params: dict = None) -> IndexResult:
+    """PhenoAge (фенотипический возраст), годы — контрольный ориентир, в LMB v0.3 не входит.
+
+    Лимфоциты, % = лимфоциты абс. / лейкоциты × 100 (один общий анализ крови).
+    """
+    p = params or load_phenoage_params()
+    g = Gate(enc, "phenoage", 1)
+    age = g.age()
+    v = {k: g.value(k) for k in PHENOAGE_INPUTS}
+    g.same_sample("lymphocytes_abs", "wbc", "mcv", "rdw", label="показатели общего анализа крови")
+    _fasting_rules(g)
+    ap = p["applicability"]
+    if age is not None and not ap["age_min"] <= age <= ap["age_max"]:
+        g.not_applicable.append(f"Возраст {age} вне выборки разработки PhenoAge ({ap['age_min']}–{ap['age_max']} лет)")
+        return g.result()          # вне выборки разработки число не выдаётся (как CAIDE)
+    if v["lymphocytes_abs"] is not None and v["wbc"] is not None and v["lymphocytes_abs"] > v["wbc"]:
+        g.invalid.append("Лимфоциты абс. больше лейкоцитов")
+    g.exclude_if_yes("acute_infection", "Острая инфекция или значимое воспаление", unknown_to_review=False,
+                     unknown_warning=True)
+    if g.blocked():
+        return g.result()
+    lymph_pct = v["lymphocytes_abs"] / v["wbc"] * 100
+    out = phenoage_from(p, v["albumin_serum"], v["creatinine_serum"], v["glucose_fasting"], v["crp"], lymph_pct,
+                        v["mcv"], v["rdw"], v["alp"], v["wbc"], age)
+    if not p["verification"]["reference_cases_verified"]:
+        g.warnings.append("PhenoAge: контрольные случаи ещё не сверены")
+    return g.result(out["phenoage"], "years", {
+        "role": "control_reference", "lymphocyte_percent": lymph_pct, "xb": out["xb"],
+        "mortality_10y": out["mortality_10y"], "params_version": p["version"], "params_sha256": p["_sha256"]})
+
+
 REGISTRY = {
     "bmi": bmi, "whtr": whtr, "asmi": asmi,
     "homa_ir": homa_ir, "tyg": tyg, "aip": aip, "non_hdl": non_hdl,
     "egfr_ckdepi_cr_2021": egfr_ckdepi_cr_2021, "acr": acr,
     "fib4": fib4, "nlr": nlr, "sii": sii,
     "score2": score2, "score2_op": score2_op, "caide": caide, "frax_kz": frax_kz,
+    "phenoage": phenoage,
 }
 
 

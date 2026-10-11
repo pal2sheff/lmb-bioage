@@ -112,3 +112,21 @@ def test_old_run_reproducible_after_new_revision(world):
     run = d.post(f"/encounters/{eid}/calculations", json={}).json()
     rep = d.post(f"/calculations/{run['calculation_id']}/reproduce").json()
     assert rep == {"identical": True, "same_engine_version": True, "same_model_config": True}
+
+
+def test_phenoage_control_via_server(world):
+    """Показатели PhenoAge принимаются сервером (миграция 0008) и дают контрольный индекс, не входящий в модель."""
+    d = world["doctor_a"]
+    eid = visit(d)
+    d.put(f"/encounters/{eid}/questionnaire", json={"answers": ANSWERS})
+    for code, v, u in [("wbc", 6.0, "10^9/L"), ("mcv", 90, "fL"), ("rdw", 13, "%"), ("albumin_serum", 4.5, "g/dL"),
+                       ("crp", 1.0, "mg/L"), ("alp", 70, "U/L")]:
+        r = d.post(f"/encounters/{eid}/observations", json={"code": code, "value": v, "unit": u})
+        assert r.status_code == 201, r.text
+    res = d.post(f"/encounters/{eid}/calculations", json={}).json()["result"]
+    ph = next(i for i in res["indices"] if i["code"] == "phenoage")
+    assert ph["status"] == "calculated" and ph["unit"] == "years" and 20 < ph["value"] < 90
+    assert ph["extra"]["role"] == "control_reference"
+    from lmb_server.catalog import observation_definitions
+    defs = {o["code"]: o for o in observation_definitions()}
+    assert defs["crp"]["in_model_inputs"] is False and defs["glucose_fasting"]["in_model_inputs"] is True

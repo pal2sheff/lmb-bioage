@@ -114,6 +114,7 @@ def run(enc: Encounter, config: Mapping, external: Optional[Mapping[str, float]]
         "model_config_sha256": config_sha256(config),
         "engine_version": __version__,
         "status": integ.status,
+        "age_years": age,                      # паспортный возраст на дату обследования, полных лет
         "indices": [r.to_dict() for r in indices.values()],
         "zscores": {c: {"status": z.status.value, "input": (config["normalization"][c].get("input") or {}).get("index"),
                         "t": z.t, "expected": z.expected,
