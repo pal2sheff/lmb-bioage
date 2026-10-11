@@ -1,6 +1,7 @@
 import { fmt } from "../api";
 import type { Catalog, DomainRes, IndexRes, Run, ZRes } from "../types";
 import { StatusBadge } from "./ui";
+import { BranchContributions, IndicatorDrivers, Trajectories } from "./Charts";
 import { unitRu } from "../units";
 
 /** Результат расчётного модуля (pipeline.run) — одинаковый у сервера и браузерного калькулятора. */
@@ -37,6 +38,17 @@ export function ProfileView({ result, catalog }: { result: EngineResult; catalog
   return (
     <>
       <Integral result={result} />
+      <div className="dv-stack">
+        <BranchContributions
+          domains={result.domains}
+          catalog={catalog}
+          intercept={result.intercept}
+          total={result.status === "calculated" && result.bioage_years !== null}
+        />
+        <IndicatorDrivers domains={result.domains} catalog={catalog} />
+      </div>
+      {result.trajectories && <Trajectories data={result.trajectories} />}
+      <h3 className="section-title">Системы организма и показатели</h3>
       <div className="branch-grid">
         {catalog.branches.map((b, n) => {
           const d = doms.get(b.code);
@@ -204,29 +216,18 @@ function Integral({ result }: { result: EngineResult }) {
       </section>
     );
   }
-  const c = result.contributions ?? {};
-  const max = Math.max(...Object.values(c).map(Math.abs), 0.01);
   return (
     <section className="integral">
       <div className="integral-figure">
         <span className="eyebrow">LMB BioAge · исследовательский режим</span>
         <span className="integral-value num">{fmt(result.bioage_years, 1)}</span>
-        <span className="muted">ΔBioAge {fmt(result.delta_years, 2)} · постоянная {fmt(result.intercept, 2)}</span>
+        <span className="muted">
+          ΔBioAge {result.delta_years! >= 0 ? "+" : "−"}
+          {fmt(Math.abs(result.delta_years!), 2)} · постоянная {fmt(result.intercept, 2)}
+        </span>
       </div>
-      <div className="contrib">
-        {Object.entries(c).map(([d, v]) => (
-          <div key={d} className="contrib-row">
-            <span>{d}</span>
-            <span className="contrib-bar">
-              <span className={v >= 0 ? "pos" : "neg"} style={{ width: `${(Math.abs(v) / max) * 50}%` }} />
-            </span>
-            <span className="num">
-              {v >= 0 ? "+" : "−"}
-              {fmt(Math.abs(v), 2)}
-            </span>
-            <span className="muted small">{v >= 0 ? "повышает расчётную оценку" : "снижает расчётную оценку"}</span>
-          </div>
-        ))}
+      <div className="integral-why">
+        <p>Разница с календарным возрастом складывается из вкладов систем ниже и постоянной модели.</p>
       </div>
     </section>
   );

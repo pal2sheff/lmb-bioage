@@ -13,8 +13,8 @@ from . import __version__
 from .cardio import model_for_age
 from .core import Encounter, Status, age_full_years, is_finite_number
 from .indices import run_all
-from .model import (ALL_DOMAINS, UNIT_CONVERSIONS, IntegralResult, ZScore, check_config, config_sha256,
-                    domain_score, integral, zscore)
+from .model import (ALL_DOMAINS, UNIT_CONVERSIONS, IntegralResult, ZScore, _inverse, attribute, check_config,
+                    config_sha256, domain_score, integral, trajectory, zscore)
 
 
 cardio_model_for_age = model_for_age  # совместимость с версией 0.1.0
@@ -79,7 +79,25 @@ def run(enc: Encounter, config: Mapping, external: Optional[Mapping[str, float]]
         zs[code] = _zscore_for(code, params, indices, external, age, enc.sex, clip)
 
     domains = {d: domain_score(d, (config.get("domains") or {}).get(d), zs) for d in ALL_DOMAINS}
+    if check.valid:
+        weights = config["integral"]["weights"]
+        for d in config["integral"]["required_domains"]:
+            attribute(domains[d], config["domains"][d], weights[d])
     integ: IntegralResult = integral(domains, config, age, check)
+
+    # траектории: ожидаемое значение по нормализации от возраста (±1 SD) и точка пациента
+    trajectories = {}
+    if age is not None and enc.sex is not None:
+        ages = list(range(max(18, age - 15), min(95, age + 15) + 1))
+        for code, z in zs.items():
+            p = config["normalization"][code]
+            if z.status != Status.CALCULATED:
+                continue
+            trajectories[code] = {
+                "label": p.get("label", code), "unit": (p.get("input") or {}).get("unit"),
+                "sign": p["sign"], "age": age, "value": _inverse(p["transform"], z.t),
+                "z_raw": z.z_raw, "z_clipped": z.z_clipped, "curve": trajectory(p, enc.sex, ages),
+            }
 
     warnings = []
     if not check.complete:
@@ -100,7 +118,9 @@ def run(enc: Encounter, config: Mapping, external: Optional[Mapping[str, float]]
                         "t": z.t, "expected": z.expected,
                         "z_raw": z.z_raw, "z_clipped": z.z_clipped, "reasons": z.reasons}
                     for c, z in zs.items()},
-        "domains": [{"domain": d.domain, "score": d.score, "inputs": d.inputs, "coefficient": d.coefficient,
+        "trajectories": trajectories,
+        "domains": [{"domain": d.domain, "score": d.score, "inputs": d.inputs,
+                     "input_contributions": d.input_contributions, "coefficient": d.coefficient,
                      "contribution": d.contribution, "status": d.status.value, "reasons": d.reasons}
                     for d in domains.values()],
         "contributions": integ.contributions,

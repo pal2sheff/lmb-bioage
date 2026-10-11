@@ -218,13 +218,17 @@ def run_browser() -> None:
         expect(renal.locator(".domain-line")).not_to_contain_text("не хватает")
         brain = page.locator(".branch").filter(has_text="Brain")
         expect(brain).to_contain_text("вне области модели CAIDE")           # 66 лет: CAIDE 39–64
+        charts = page.locator("section[aria-labelledby=dv-branches]")       # графики общие с калькулятором
+        expect(charts.locator(".dv-row").filter(has_text="Renal")).not_to_have_class("dv-row is-missing")
+        expect(charts.locator(".dv-row.is-missing").filter(has_text="Brain")).to_contain_text("нет вклада")
+        expect(page.locator(".traj").filter(has_text="eGFR")).to_have_count(1)
         page.get_by_text("Причины").click()
         expect(page.locator(".integral")).to_contain_text("целевая популяция модели не утверждена")
         page.get_by_role("button", name="Проверить воспроизводимость").click()
         expect(page.get_by_text("результат совпадает полностью")).to_be_visible()
         page.wait_for_timeout(800)  # дождаться анимации появления карточек
         page.screenshot(path=SHOTS / "06_profile.png", full_page=True)
-        step("профиль 9 веток, Z-оценки v0.3, итог заблокирован с причинами, расчёт воспроизводится")
+        step("профиль 9 веток, Z-оценки v0.3, графики вкладов и траекторий, итог заблокирован с причинами, расчёт воспроизводится")
 
         page.set_viewport_size({"width": 390, "height": 844})
         page.wait_for_timeout(300)

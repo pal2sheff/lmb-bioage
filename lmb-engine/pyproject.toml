@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lmb-engine"
-version = "0.4.0"
+version = "0.4.1"
 description = "Расчётный модуль LMB BioAge: клинические индексы, применимость, модель v0.3"
 requires-python = ">=3.10"
 dependencies = []
