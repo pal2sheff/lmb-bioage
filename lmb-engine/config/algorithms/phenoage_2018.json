@@ -1,0 +1,40 @@
+{
+  "code": "phenoage",
+  "version": "2018-liu-correction-2019",
+  "title": "Phenotypic Age (PhenoAge), Levine 2018",
+  "role": "control_reference",
+  "role_note": "Контрольный ориентир для проверки расчёта LMB (решение владельца 11.10.2026). В формулу LMB v0.3 не входит.",
+  "units": {
+    "albumin": "g/L", "creatinine": "umol/L", "glucose": "mmol/L", "crp": "mg/dL (натуральный логарифм)",
+    "lymphocyte_percent": "%", "mcv": "fL", "rdw": "%", "alp": "U/L", "wbc": "10^3 cells/uL (= 10^9/L)", "age": "years"
+  },
+  "xb": {
+    "intercept": -19.907,
+    "albumin": -0.0336,
+    "creatinine": 0.0095,
+    "glucose": 0.1953,
+    "ln_crp": 0.0954,
+    "lymphocyte_percent": -0.0120,
+    "mcv": 0.0268,
+    "rdw": 0.3306,
+    "alp": 0.00188,
+    "wbc": 0.0554,
+    "age": 0.0804
+  },
+  "mortality": {"gamma": 0.0076927, "months": 120, "factor": 1.51714},
+  "conversion": {"intercept": 141.50, "ln_scale": -0.00553, "divisor": 0.09165},
+  "conversion_alternative": {
+    "intercept": 141.50225, "ln_scale": -0.00553, "divisor": 0.090165,
+    "note": "Константы исходного калькулятора Левин 2018 и патента US20200347461A1; поправка PLoS Med 2019 приводит 141.50 и 0.09165. Используется поправка; расхождение — около 1–1,5 года."
+  },
+  "applicability": {"age_min": 20, "age_max": 84, "fasting_required": true},
+  "sources": [
+    "Levine ME et al. An epigenetic biomarker of aging for lifespan and healthspan. Aging (Albany NY) 2018;10(4):573–591. Таблица 1: веса и единицы.",
+    "Liu Z et al. A new aging measure captures morbidity and mortality risk across diverse subpopulations from NHANES IV. PLoS Med 2018;15(12):e1002718: взрослые 20–84 лет, натощак ≥8 ч.",
+    "Correction: PLoS Med 2019;16(2):e1002760 — полная формула xb, M = 1 − exp(−1.51714·exp(xb)/0.0076927), PhenoAge = 141.50 + ln(−0.00553·ln(1 − M))/0.09165."
+  ],
+  "verification": {
+    "reference_cases_verified": false,
+    "note": "Нет официальных контрольных случаев; 1.51714 проверено как exp(120·0.0076927) − 1. Требуются эталоны владельца (например, расчёт сертифицированным калькулятором для тех же входов)."
+  }
+}

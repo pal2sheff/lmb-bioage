@@ -62,6 +62,16 @@ INPUTS = {d.code: d for d in [
     InputDef("platelets", "Тромбоциты", "10^9/L", CELL, (5, 1500), CELL_REJECT),
     InputDef("neutrophils_abs", "Нейтрофилы абс.", "10^9/L", CELL, (0.1, 100), CELL_REJECT),
     InputDef("lymphocytes_abs", "Лимфоциты абс.", "10^9/L", CELL, (0.1, 100), CELL_REJECT),
+    # Контрольный показатель PhenoAge (не входит в LMB v0.3). Перевод г/дл → г/л и мг/дл → мг/л — смена
+    # десятичного множителя внутри одной единицы массы, а не лабораторный коэффициент.
+    InputDef("wbc", "Лейкоциты", "10^9/L", CELL, (0.5, 200), CELL_REJECT),
+    InputDef("mcv", "Средний объём эритроцита (MCV)", "fL", {"fL": _identity}, (40, 160), {}),
+    InputDef("rdw", "Ширина распределения эритроцитов (RDW-CV)", "%", {"%": _identity}, (5, 40),
+             {"fL": "Нужен RDW-CV в %; RDW-SD (фл) не подставляется"}),
+    InputDef("albumin_serum", "Альбумин сыворотки", "g/L", {"g/L": _identity, "g/dL": lambda x: x * 10}, (10, 70), {}),
+    InputDef("crp", "С-реактивный белок (высокочувствительный)", "mg/L",
+             {"mg/L": _identity, "mg/dL": lambda x: x * 10}, (0.01, 500), {}),
+    InputDef("alp", "Щелочная фосфатаза", "U/L", {"U/L": _identity, "IU/L": _identity}, (5, 3000), {}),
     InputDef("visbody_asm", "Масса мышц конечностей", "kg", {"kg": _identity}, (5, 60), {}),
     # МПК только шейки бедра (позвоночник и общий проксимальный отдел не подставляются)
     InputDef("fn_tscore", "T-показатель шейки бедра (референс NHANES III)", "SD", {"SD": _identity}, (-6, 6), {}),

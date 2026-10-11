@@ -33,13 +33,12 @@ export function Bar({ value, max }: { value: number; max: number }) {
   );
 }
 
-/** Вклад веток модели v0.3: коэффициент × доменная оценка, в условных годах модели. */
-export function BranchContributions({ domains, catalog, intercept, total, research = false }: {
+/** Вклад систем: коэффициент модели × доменная оценка, в годах модели. */
+export function BranchContributions({ domains, catalog, intercept, total }: {
   domains: DomainRes[];
   catalog: Catalog;
   intercept: number;
   total: boolean;
-  research?: boolean;
 }) {
   const title = Object.fromEntries(catalog.branches.map((b) => [b.code, b]));
   const dom = new Map(domains.map((d) => [d.domain, d]));
@@ -86,13 +85,11 @@ export function BranchContributions({ domains, catalog, intercept, total, resear
         ))}
       </div>
       <p className="dv-note small muted">
-        Вклад = коэффициент модели v0.3 × доменная оценка, в условных годах модели. Постоянная модели {signed(intercept)}.{" "}
+        Вклад = коэффициент модели × доменная оценка, в годах модели. Постоянная модели {signed(intercept)}.{" "}
         {total
-          ? "Сумма вкладов и постоянной равна разнице между расчётным и календарным возрастом."
-          : research
-            ? "Клинический итог не утверждён; сумма вкладов и постоянной равна отклонению исследовательского расчёта выше."
-            : "Клинический итог не рассчитан, вклады не суммируются."}{" "}
-        {extra.length > 0 && <>{extra.join(" и ")} показываются в своих единицах и в модель v0.3 не входят.</>}
+          ? "Сумма вкладов и постоянной равна разнице биологического и паспортного возраста."
+          : "Пока рассчитаны не все семь систем, вклады не складываются в биологический возраст."}{" "}
+        {extra.length > 0 && <>{extra.join(" и ")} показываются в своих единицах и в модель не входят.</>}
       </p>
     </section>
   );
@@ -135,77 +132,107 @@ export function IndicatorDrivers({ domains, catalog }: { domains: DomainRes[]; c
   );
 }
 
-/** Траектории: ожидаемое значение показателя с возрастом для пола пациента (±1 SD) и точка пациента. */
-export function Trajectories({ data }: { data: Record<string, Trajectory> }) {
-  const codes = Object.keys(INDEX_LABEL).filter((c) => c in data);
+const SYSTEM_OF: Record<string, string> = {
+  score2: "cardio", homa_ir: "metabolic", tyg: "metabolic", aip: "metabolic", whtr: "metabolic", egfr: "renal",
+  acr: "renal", fib4: "hepatic", nlr: "inflammation", sii: "inflammation", caide: "brain", frax_major: "bone",
+};
+const SYSTEM_RU: Record<string, string> = {
+  cardio: "Cardio", metabolic: "Metabolic", renal: "Renal", hepatic: "Hepatic", inflammation: "Inflammation",
+  brain: "Brain", bone: "Bone",
+};
+const digitsFor = (v: number) => (Math.abs(v) >= 100 ? 0 : Math.abs(v) >= 10 ? 1 : 2);
+
+/**
+ * Одна диаграмма для всех показателей: общая безразмерная ось Z (отклонение от ожидаемого для возраста
+ * и пола) и в каждой строке — траектория ожидаемого значения по возрасту в исходных единицах показателя.
+ * Значения разных единиц на одну числовую ось не кладутся; общая ось — только Z.
+ */
+export function DeviationChart({ data }: { data: Record<string, Trajectory> }) {
+  const codes = Object.keys(SYSTEM_OF).filter((c) => c in data);
   if (codes.length === 0) return null;
+  const ZMAX = 3;
+  const pos = (z: number) => ((Math.max(-ZMAX, Math.min(ZMAX, z)) + ZMAX) / (2 * ZMAX)) * 100;
   return (
     <section className="dv-card traj-section" aria-labelledby="dv-traj">
       <header className="dv-head">
         <h3 id="dv-traj">Показатели на траектории возраста</h3>
         <p className="dv-legend">
           <span className="dv-key line" /> ожидаемое для возраста и пола <span className="dv-key band" /> ±1 стандартное
-          отклонение <span className="dv-key dot" /> пациент
+          отклонение <span className="dv-key up" /> неблагоприятнее <span className="dv-key down" /> благоприятнее
         </p>
       </header>
-      <div className="traj-grid">
-        {codes.map((c) => (
-          <TrajectoryChart key={c} code={c} t={data[c]} />
-        ))}
+      <div className="dev-grid" role="table" aria-label="Отклонение показателей от ожидаемого">
+        <div className="dev-row dev-head" role="row">
+          <span role="columnheader">Показатель</span>
+          <span role="columnheader">Траектория с возрастом</span>
+          <span role="columnheader" className="dev-axis-head">
+            <span style={{ left: "0%" }}>−3</span>
+            <span style={{ left: "33.333%" }}>−1</span>
+            <span style={{ left: "50%" }}>0</span>
+            <span style={{ left: "66.667%" }}>+1</span>
+            <span style={{ left: "100%" }}>+3</span>
+          </span>
+          <span role="columnheader" className="dev-num">Пациент / ожидаемое</span>
+        </div>
+        {codes.map((c, i) => {
+          const t = data[c];
+          const at = t.curve.find((p) => p.age === t.age);
+          const tone = Math.abs(t.z_raw) < 0.05 ? "mid" : t.z_raw > 0 ? "up" : "down";
+          const d = digitsFor(t.value);
+          const unit = unitRu(t.unit);
+          const newGroup = i === 0 || SYSTEM_OF[codes[i - 1]] !== SYSTEM_OF[c];
+          return (
+            <div key={c} className={`dev-row${newGroup ? " group-start" : ""}`} role="row"
+              title={`${INDEX_LABEL[c]}: пациент ${fmt(t.value, d)}${unit ? " " + unit : ""}, ожидаемое ${at ? fmt(at.expected, d) : "—"}, Z ${signed(t.z_raw, 2)}`}>
+              <span className="dev-label" role="cell">
+                <strong>{INDEX_LABEL[c] ?? c}</strong>
+                <span className="muted small">{SYSTEM_RU[SYSTEM_OF[c]]}{c === "score2" ? " · от авторского ожидания" : ""}</span>
+              </span>
+              <span role="cell"><Spark t={t} tone={tone} /></span>
+              <span className="dev-strip" role="cell" aria-label={`Z ${signed(t.z_raw, 2)}`}>
+                <span className="dev-band" />
+                <span className="dev-zero" />
+                <span className={`dev-stem ${tone}`} style={t.z_raw >= 0
+                  ? { left: "50%", width: `${pos(t.z_raw) - 50}%` } : { left: `${pos(t.z_raw)}%`, width: `${50 - pos(t.z_raw)}%` }} />
+                <span className={`dev-dot ${tone}`} style={{ left: `${pos(t.z_raw)}%` }} />
+                {Math.abs(t.z_raw) > ZMAX && <span className={`dev-clip ${t.z_raw > 0 ? "right" : "left"}`}>{signed(t.z_raw, 1)}</span>}
+              </span>
+              <span className="dev-num num" role="cell">
+                {fmt(t.value, d)} <span className="muted">/ {at ? fmt(at.expected, d) : "—"}</span>
+                {unit && <span className="muted small"> {unit}</span>}
+              </span>
+            </div>
+          );
+        })}
       </div>
       <p className="dv-note small muted">
-        Ожидаемые значения — нормализация модели LMB v0.3 (авторская конфигурация, не клинические нормы). Точка выше или
-        ниже линии показывает отклонение от ожидаемого для своего возраста; Z — это отклонение в стандартных отклонениях.
+        Ожидаемое значение — нормализация модели LMB (авторская конфигурация, не клинические нормы). Z — отклонение от
+        ожидаемого в стандартных отклонениях: вправо — неблагоприятнее, влево — благоприятнее; в модель входит Z,
+        ограниченное ±3.
       </p>
     </section>
   );
 }
 
-function TrajectoryChart({ code, t }: { code: string; t: Trajectory }) {
-  const W = 300, H = 150, L = 44, R = 10, T = 12, B = 24;
+/** Мини-траектория: ожидаемое по возрасту (±1 SD) в единицах показателя и точка пациента. */
+function Spark({ t, tone }: { t: Trajectory; tone: string }) {
+  const W = 160, H = 40, P = 4;
   const xs = t.curve.map((p) => p.age);
   const ys = t.curve.flatMap((p) => [p.lo, p.hi]).concat(t.value);
   const x0 = Math.min(...xs), x1 = Math.max(...xs);
-  let y0 = Math.min(...ys), y1 = Math.max(...ys);
-  const pad = (y1 - y0) * 0.08 || 1;
-  y0 -= pad;
-  y1 += pad;
-  const X = (a: number) => L + ((a - x0) / (x1 - x0)) * (W - L - R);
-  const Y = (v: number) => T + (1 - (v - y0) / (y1 - y0)) * (H - T - B);
-  const band =
-    t.curve.map((p, i) => `${i ? "L" : "M"}${X(p.age).toFixed(1)},${Y(p.hi).toFixed(1)}`).join("") +
+  const y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const X = (a: number) => P + ((a - x0) / (x1 - x0 || 1)) * (W - 2 * P);
+  const Y = (v: number) => P + (1 - (v - y0) / (y1 - y0 || 1)) * (H - 2 * P);
+  const band = t.curve.map((p, i) => `${i ? "L" : "M"}${X(p.age).toFixed(1)},${Y(p.hi).toFixed(1)}`).join("") +
     t.curve.slice().reverse().map((p) => `L${X(p.age).toFixed(1)},${Y(p.lo).toFixed(1)}`).join("") + "Z";
   const line = t.curve.map((p, i) => `${i ? "L" : "M"}${X(p.age).toFixed(1)},${Y(p.expected).toFixed(1)}`).join("");
-  const worse = t.z_raw > 0;
-  const near = Math.abs(t.z_raw) < 0.05;
-  const tone = near ? "mid" : worse ? "up" : "down";
-  const unit = unitRu(t.unit);
-  const digits = Math.abs(t.value) >= 100 ? 0 : Math.abs(t.value) >= 10 ? 1 : 2;
   const at = t.curve.find((p) => p.age === t.age);
   return (
-    <figure className="traj">
-      <figcaption>
-        <strong>{INDEX_LABEL[code] ?? code}</strong>
-        {unit && <span className="muted small"> {unit}</span>}
-        {code === "score2" && <span className="traj-note">отклонение от авторского ожидания v0.3, не категория риска</span>}
-        <span className={`traj-z ${tone}`}>
-          Z {signed(t.z_raw, 1)} · {near ? "на уровне" : worse ? "неблагоприятнее" : "благоприятнее"} ожидаемого
-        </span>
-      </figcaption>
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${INDEX_LABEL[code]}: пациент ${fmt(t.value, digits)}${unit ? " " + unit : ""}, ожидаемое ${at ? fmt(at.expected, digits) : "—"}, Z ${signed(t.z_raw, 1)}`}>
-        <line className="traj-gridline" x1={L} x2={W - R} y1={Y(y0 + pad)} y2={Y(y0 + pad)} />
-        <path className="traj-band" d={band} />
-        <path className="traj-line" d={line} />
-        {at && <line className="traj-gap" x1={X(t.age)} x2={X(t.age)} y1={Y(at.expected)} y2={Y(t.value)} />}
-        <circle className={`traj-dot ${tone}`} cx={X(t.age)} cy={Y(t.value)} r={5.5}>
-          <title>{`Пациент, ${t.age} лет: ${fmt(t.value, digits)}${unit ? " " + unit : ""}; ожидаемое ${at ? fmt(at.expected, digits) : "—"}`}</title>
-        </circle>
-        <text className="traj-tick" x={L - 6} y={Y(y1 - pad) + 4} textAnchor="end">{fmt(y1 - pad, digits)}</text>
-        <text className="traj-tick" x={L - 6} y={Y(y0 + pad) + 4} textAnchor="end">{fmt(y0 + pad, digits)}</text>
-        <text className="traj-tick" x={X(x0)} y={H - 6} textAnchor="start">{x0}</text>
-        <text className="traj-tick" x={X(x1)} y={H - 6} textAnchor="end">{x1} лет</text>
-        <text className="traj-tick strong" x={X(t.age)} y={H - 6} textAnchor="middle">{t.age}</text>
-      </svg>
-    </figure>
+    <svg className="spark" viewBox={`0 0 ${W} ${H}`} aria-hidden="true" preserveAspectRatio="none">
+      <path className="traj-band" d={band} />
+      <path className="traj-line" d={line} vectorEffect="non-scaling-stroke" />
+      {at && <line className="traj-gap" x1={X(t.age)} x2={X(t.age)} y1={Y(at.expected)} y2={Y(t.value)} vectorEffect="non-scaling-stroke" />}
+      <circle className={`traj-dot ${tone}`} cx={X(t.age)} cy={Y(t.value)} r={3.6} />
+    </svg>
   );
 }

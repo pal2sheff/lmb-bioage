@@ -163,6 +163,7 @@ export interface Run {
     zscores?: Record<string, ZRes>;
     trajectories?: Record<string, Trajectory>;
     research?: ResearchRes;
+    age_years?: number | null;
     contributions: Record<string, number> | null;
     intercept: number;
     warnings: string[];

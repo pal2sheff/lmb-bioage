@@ -70,6 +70,10 @@ def validate_answer(code: str, value: str) -> str | None:
     return None if value in allowed else f"{code}: допустимо {allowed}"
 
 
+# входы только контрольного PhenoAge: хранятся, но в LMB v0.3 не входят
+CONTROL_ONLY_INPUTS = ("wbc", "mcv", "rdw", "albumin_serum", "crp", "alp")
+
+
 def observation_definitions() -> list[dict]:
     out = []
     for code, d in INPUTS.items():
@@ -78,7 +82,7 @@ def observation_definitions() -> list[dict]:
         lo, hi = d.plausible if d.plausible else (None, None)
         out.append(dict(code=code, name_ru=d.name_ru, value_type="number", unit_canonical=d.canonical_unit,
                         allowed_units=sorted(d.conversions), plausible_min=lo, plausible_max=hi,
-                        in_model_inputs=True, in_checkup=True))
+                        in_model_inputs=code not in CONTROL_ONLY_INPUTS, in_checkup=True))
     out.append(dict(code="acr_lab", name_ru="ACR лаборатории", value_type="number", unit_canonical=None,
                     allowed_units=["mg/mmol", "mg/g"], plausible_min=0, plausible_max=5000,
                     in_model_inputs=True, in_checkup=True))
@@ -91,7 +95,8 @@ OBSERVATION_GROUPS = [
     ("Углеводный и липидный обмен", ["glucose_fasting", "insulin_fasting", "tg", "tc", "hdl"]),
     ("Почки", ["creatinine_serum", "u_albumin", "u_creatinine", "acr_lab"]),
     ("Печень", ["ast", "alt"]),
-    ("Общий анализ крови", ["platelets", "neutrophils_abs", "lymphocytes_abs"]),
+    ("Общий анализ крови", ["platelets", "neutrophils_abs", "lymphocytes_abs", "wbc", "mcv", "rdw"]),
+    ("Контроль PhenoAge: биохимия", ["albumin_serum", "crp", "alp"]),
     ("Минеральная плотность шейки бедра", ["fn_tscore", "fn_bmd"]),
     ("Мышцы (Visbody)", ["visbody_asm"]),
 ]
@@ -122,6 +127,7 @@ INDEX_LABELS = {
     "caide": ("CAIDE", "20-летний риск деменции, баллы"),
     "frax_kz": ("FRAX", "10-летний риск переломов, модель Казахстана"),
     "asmi": ("ASMI", "Индекс мышечной массы конечностей"),
+    "phenoage": ("PhenoAge", "Фенотипический возраст (Levine 2018), контрольный ориентир"),
 }
 
 BRANCHES = [

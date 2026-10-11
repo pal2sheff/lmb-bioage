@@ -4,7 +4,7 @@ import { ProfileView, type EngineResult } from "../components/ProfileView";
 import { Alert, Button } from "../components/ui";
 import type { Catalog, QItem } from "../types";
 import { unitRu } from "../units";
-import { EXAMPLE } from "./example";
+import { EXAMPLE, EXAMPLE_YOUNGER } from "./example";
 import { loadEngine, type CalcCase, type Engine } from "./engine";
 
 export interface FormState {
@@ -153,7 +153,10 @@ export function CalcApp() {
           <section className="calc-form" aria-label="Данные пациента">
             <div className="calc-actions row">
               <Button small onClick={() => setForm(EXAMPLE)}>
-                Синтетический пример
+                Пример 1: старше паспортного
+              </Button>
+              <Button small onClick={() => setForm(EXAMPLE_YOUNGER)}>
+                Пример 2: моложе паспортного
               </Button>
               <Button small onClick={() => setForm({ ...EMPTY, encounter_date: today() })}>
                 Очистить
@@ -194,7 +197,7 @@ export function CalcApp() {
                 <h3>Профиль появится здесь</h3>
                 <p className="muted">
                   Укажите дату рождения, дату обследования и пол, затем вносите показатели — расчёт обновляется
-                  сразу. Для знакомства нажмите «Синтетический пример».
+                  сразу. Для знакомства откройте один из синтетических примеров.
                 </p>
               </div>
             )}
@@ -211,10 +214,7 @@ export function CalcApp() {
             {engine && result && (
               <>
                 <div className="toolbar no-print">
-                  <p className="muted small">
-                    Расчёт выполнен в браузере тем же модулем, что и на сервере. Возраст на дату обследования:{" "}
-                    {ageText(form)}.
-                  </p>
+                  <span />
                   <Button small onClick={() => window.print()}>
                     Печать
                   </Button>
@@ -227,15 +227,6 @@ export function CalcApp() {
       </main>
     </div>
   );
-}
-
-function ageText(f: FormState): string {
-  if (!f.birth_date || !f.encounter_date) return "—";
-  const b = new Date(f.birth_date);
-  const d = new Date(f.encounter_date);
-  let a = d.getFullYear() - b.getFullYear();
-  if (d.getMonth() < b.getMonth() || (d.getMonth() === b.getMonth() && d.getDate() < b.getDate())) a -= 1;
-  return `${a} полных лет`;
 }
 
 function Inputs(props: {

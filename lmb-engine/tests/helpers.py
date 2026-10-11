@@ -11,6 +11,7 @@ UNITS = {
     "hdl": "mmol/L", "creatinine_serum": "umol/L", "u_albumin": "mg/L", "u_creatinine": "mmol/L",
     "ast": "U/L", "alt": "U/L", "platelets": "10^9/L", "neutrophils_abs": "10^9/L",
     "lymphocytes_abs": "10^9/L", "visbody_asm": "kg", "sbp_mmhg": "mmHg",
+    "wbc": "10^9/L", "mcv": "fL", "rdw": "%", "albumin_serum": "g/L", "crp": "mg/L", "alp": "U/L",
 }
 
 CLEAN_FLAGS = {"fasting_status": "yes", "insulin_therapy": "no", "diabetes": "no",
