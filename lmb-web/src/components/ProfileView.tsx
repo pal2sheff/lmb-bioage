@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import { fmt } from "../api";
-import type { Catalog, DomainRes, IndexRes, Run, ZRes } from "../types";
+import type { CardioAnchor, Catalog, DomainRes, IndexRes, Run, ZRes } from "../types";
 import { unitRu } from "../units";
 import { AgeGraphs, BranchContributions, DeviationChart, IndicatorDrivers, signed } from "./Charts";
-import { ResearchToggle, useResearchMode } from "./TestMode";
+import { ResearchToggle, useCardioCheck, useResearchMode } from "./TestMode";
 import { StatusBadge } from "./ui";
 
 /** Результат расчётного модуля (pipeline.run) — одинаковый у сервера и браузерного калькулятора. */
@@ -74,7 +74,7 @@ export function ProfileView({ result, catalog, meta }: { result: EngineResult; c
     <>
       <ClinicalStatusLine result={result} catalog={catalog} />
       {result.research && <ResearchToggle on={research} onChange={setResearch} />}
-      {research && result.research && <ResearchCard result={result} catalog={catalog} pheno={idx.get("phenoage")} />}
+      {research && result.research && <ResearchCard result={result} catalog={catalog} pheno={idx.get("phenoage")} withCheck />}
 
       <div className="dv-stack">
         <BranchContributions domains={result.domains} catalog={catalog} intercept={result.intercept} total={bio !== null} />
@@ -118,7 +118,12 @@ export function ClinicalStatusLine({ result, catalog }: { result: EngineResult; 
 }
 
 /** Исследовательский результат: календарный возраст, расчётная оценка, разница, ограничения, контроль PhenoAge. */
-export function ResearchCard({ result, catalog, pheno }: { result: EngineResult; catalog: Catalog; pheno?: IndexRes }) {
+export function ResearchCard({ result, catalog, pheno, withCheck = false }: {
+  result: EngineResult;
+  catalog: Catalog;
+  pheno?: IndexRes;
+  withCheck?: boolean;
+}) {
   const r = result.research!;
   const age = result.age_years ?? null;
   const ok = r.status === "calculated" && r.bioage_years !== null && r.delta_years !== null;
@@ -194,7 +199,79 @@ export function ResearchCard({ result, catalog, pheno }: { result: EngineResult;
           )}
         </div>
       )}
+      {withCheck && r.cardio_anchor_experiment && (
+        <CardioCheck x={r.cardio_anchor_experiment} result={result} pheno={phenoOk ? pheno!.value! : null} />
+      )}
     </section>
+  );
+}
+
+/** Проверочный расчёт Cardio рядом с исходным (задание владельца 11.10.2026). В отчёт не входит. */
+function CardioCheck({ x, result, pheno }: { x: CardioAnchor; result: EngineResult; pheno: number | null }) {
+  const [on, setOn] = useCardioCheck();
+  const r = result.research!;
+  const z = result.zscores?.score2;
+  const expected = z?.expected != null ? Math.expm1(z.expected) : null;
+  const ok = x.status === "calculated" && r.status === "calculated";
+  const row = (label: string, a: ReactNode, b: ReactNode) => (
+    <tr>
+      <th scope="row">{label}</th>
+      <td className="num">{a}</td>
+      <td className="num">{b}</td>
+    </tr>
+  );
+  // фиксированное число знаков, чтобы колонки сравнивались по разрядам
+  const fx = (v: number, d: number) => v.toFixed(d).replace(".", ",").replace("-", "−");
+  const sg = (v: number, d: number) => (v > 0 ? "+" : "") + fx(v, d);
+  const pct = (v: number | null | undefined, d = 3) => (v == null ? "—" : `${fx(v, d)} %`);
+  const num = (v: number | null | undefined, d = 3) => (v == null ? "—" : sg(v, d));
+  return (
+    <div className="cardio-check no-print">
+      <label className="research-toggle small-toggle">
+        <span className="switch">
+          <input type="checkbox" role="switch" checked={on} onChange={(e) => setOn(e.target.checked)}
+            aria-label="Проверочный расчёт Cardio" />
+          <span />
+        </span>
+        Проверочный расчёт Cardio (условный контрольный профиль)
+      </label>
+      {on && (
+        <div className="check-body" aria-label={x.label}>
+          <h3>{x.label}</h3>
+          <p className="limits check-note" role="note">
+            {x.disclaimer}. Ожидание Cardio заменено SCORE2 High контрольного профиля того же пола и возраста
+            (САД {x.control_profile.sbp_mmhg}, общий холестерин {fmt(x.control_profile.tc_mmol_l, 1)}, ЛПВП{" "}
+            {fmt(x.control_profile.hdl_mmol_l, 1)} ммоль/л, без курения); делитель {fmt(x.residual_sd, 6)} — из
+            исходной модели, новой выборкой не подтверждён.
+          </p>
+          <table className="check-table">
+            <thead>
+              <tr>
+                <th />
+                <th scope="col">Исходная модель</th>
+                <th scope="col">Проверочный расчёт</th>
+              </tr>
+            </thead>
+            <tbody>
+              {row("SCORE2 пациента", pct(x.score2_pct), pct(x.score2_pct))}
+              {row("Ожидание / контрольный риск", pct(expected), pct(x.control_score2_pct))}
+              {row("Нормированная оценка Cardio", num(z?.z_clipped ?? null), num(x.z_clipped))}
+              {row("Вклад Cardio, лет", num(r.contributions?.cardio ?? null), num(x.contribution))}
+              {row("LMB BioAge, лет", r.bioage_years == null ? "—" : fx(r.bioage_years, 2), x.bioage_years == null ? "—" : fx(x.bioage_years, 2))}
+              {pheno != null && row("Разница с PhenoAge, лет", r.bioage_years == null ? "—" : sg(r.bioage_years - pheno, 2),
+                x.bioage_years == null ? "—" : sg(x.bioage_years - pheno, 2))}
+            </tbody>
+          </table>
+          {ok ? (
+            <p className="check-change">
+              Изменение общего результата: <b className="num">{sg(x.change_years!, 2)} лет</b>
+            </p>
+          ) : (
+            <p className="muted">Проверочный итог не рассчитан: {x.reasons[0] ?? x.status}</p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

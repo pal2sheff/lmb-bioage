@@ -118,6 +118,28 @@ export interface Trajectory {
 }
 
 /** Исследовательский расчёт неизменённой v0.3 (режим local_synthetic); не клинический итог. */
+/** Проверочный режим cardio_anchor_experiment_v1: ожидание Cardio = SCORE2 условного контрольного профиля. */
+export interface CardioAnchor {
+  id: string;
+  status: string;
+  label: string;
+  disclaimer: string;
+  control_profile: { sbp_mmhg: number; tc_mmol_l: number; hdl_mmol_l: number; smoker: boolean };
+  residual_sd: number;
+  weight: number;
+  age_exact_years: number | null;
+  score2_pct: number | null;
+  control_score2_pct: number | null;
+  z_raw: number | null;
+  z_clipped: number | null;
+  contribution: number | null;
+  contribution_v03: number | null;
+  delta_years: number | null;
+  bioage_years: number | null;
+  change_years: number | null;
+  reasons: string[];
+}
+
 export interface ResearchRes {
   status: "calculated" | "blocked" | "not_applicable" | "model_not_configured";
   mode: string | null;
@@ -132,6 +154,7 @@ export interface ResearchRes {
   bioage_years: number | null;
   limitations: string[];
   reasons: string[];
+  cardio_anchor_experiment?: CardioAnchor | null;
 }
 
 export interface DomainRes {
