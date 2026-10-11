@@ -38,6 +38,12 @@ def main() -> int:
     base = f"http://127.0.0.1:{srv.server_address[1]}/"
     try:
         run(base)
+    except Exception as exc:
+        # аннотация GitHub Actions: причина видна в сводке проверки без скачивания журнала
+        last = STEPS[-1] if STEPS else "до первого шага"
+        text = f"Сбой после шага «{last}»: {type(exc).__name__}: {exc}"[:1500]
+        print("::error title=Калькулятор e2e::" + text.replace("%", "%25").replace("\r", "").replace("\n", "%0A"))
+        raise
     finally:
         srv.shutdown()
     print(f"Сценарий пройден: {len(STEPS)} шагов")
