@@ -182,6 +182,23 @@ export interface DomainRes {
   reasons: string[];
 }
 
+/** Исходные данные мышечной ветки (lmb_engine.muscle.raw_measurements). */
+export interface MuscleMeasurements {
+  grip_right_kg: number | null;
+  grip_left_kg: number | null;
+  grip_used_kg: number | null;
+  chair_stand_5x_s: number | null;
+  chair_stand_unable: boolean;
+  visbody_seg_arm_left_kg: number | null;
+  visbody_seg_arm_right_kg: number | null;
+  visbody_seg_leg_left_kg: number | null;
+  visbody_seg_leg_right_kg: number | null;
+  asm_kg: number | null;
+  height_m: number | null;
+  asmi_kg_m2: number | null;
+  asm_source: string;
+}
+
 export interface Run {
   calculation_id: string;
   snapshot_id: string;
@@ -199,6 +216,7 @@ export interface Run {
     zscores?: Record<string, ZRes>;
     trajectories?: Record<string, Trajectory>;
     research?: ResearchRes;
+    muscle_measurements?: MuscleMeasurements;
     age_years?: number | null;
     input_checks?: InputCheck[];
     model_version?: string;

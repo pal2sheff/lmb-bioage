@@ -134,7 +134,7 @@ def test_lqone_report_only_in_lqone_document():
              "Геронтологическая кривая", "Биологический возраст, лет 52", "Отклонение биологического возраста, лет -3"]
     r = candidates(rows_from_lines(lqone), ENC)
     assert one(r, "lqone_bioage_years")["value"] == "52" and one(r, "lqone_bioage_years")["unit"] == "years"
-    assert one(r, "lqone_reliability_pct")["value"] == "87"
+    assert not by_code(r, "lqone_reliability_pct")                     # достоверность не переносится (одно поле)
     other = candidates(rows_from_lines(["Биологический возраст 40 лет"]), ENC)
     assert not by_code(other, "lqone_bioage_years")
 

@@ -112,3 +112,23 @@ def test_not_in_lmb_and_no_double_counting():
         assert dom["status"] == "not_included" and dom["contribution"] is None
     assert math.isclose(sum(out["research"]["contributions"].values()) + out["research"]["intercept"],
                         out["research"]["delta_years"])
+
+
+def test_raw_measurements_summary_independent_of_status():
+    """Исходные данные для экрана и отчёта есть и у женщин, и при невыполненных вставаниях."""
+    from lmb_engine.muscle import raw_measurements
+    r = raw_measurements(enc(age=42, sex=Sex.FEMALE, **CONTROL))
+    assert r["grip_used_kg"] == 50 and r["asm_kg"] == pytest.approx(25.75) and r["height_m"] == pytest.approx(1.7)
+    assert r["asmi_kg_m2"] == pytest.approx(8.910034602076125) and r["chair_stand_5x_s"] == 6
+    u = raw_measurements(enc(age=42, sex=Sex.MALE, flags={"chair_stand_result": "unable"}, height_cm=170))
+    assert u["chair_stand_unable"] is True and u["asm_kg"] is None and u["chair_stand_5x_s"] is None
+
+
+def test_same_measurements_at_42_and_50():
+    """Одинаковые измерения: 33,69 в 42 года и 32,74 в 50 лет — P не меняется, а P_ref растёт быстрее возраста
+    (docs/muscle_age_review.md)."""
+    a42 = muscle_age(enc(age=42, sex=Sex.MALE, **CONTROL))
+    a50 = muscle_age(enc(age=50, sex=Sex.MALE, **CONTROL))
+    assert a42.extra["p"] == pytest.approx(a50.extra["p"])
+    assert a50.value == pytest.approx(32.73776710858231, abs=1e-9)
+    assert a50.extra["p_ref"] - a42.extra["p_ref"] > 8                      # +8,95 при +8 годах

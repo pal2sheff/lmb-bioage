@@ -1,4 +1,4 @@
-"""LQ One: ручной ввод итогового показателя заключения — только отображение, в LMB v0.3 не входит."""
+"""«Возраст по LQ1»: одно поле, значение передаётся без пересчёта; в LMB v0.3 не входит (решение 12.10.2026, 22:05)."""
 from lmb_engine.core import Measurement, Status
 from lmb_engine.indices import lqone_bioage
 from lmb_engine.model import config_path, load_config
@@ -13,22 +13,13 @@ def enc_with(**ms):
     return e
 
 
-def test_missing_and_display():
+def test_value_passed_unchanged_without_extra_requirements():
     assert lqone_bioage(encounter(EXAMPLE_1)).status == Status.MISSING_DATA
-    e = enc_with(lqone_bioage_years=(52, "years"), lqone_reliability_pct=(87, "%"))
-    e.flags = {**e.flags, "lqone_device_model": "LQ One", "lqone_software_version": "1.0",
-               "lqone_measured_on": "2026-10-10"}
-    r = lqone_bioage(e)
-    assert r.status == Status.CALCULATED and r.value == 52 and r.unit == "years"
-    assert r.extra["reliability_pct"] == 87 and r.extra["in_model"] is False and not r.warnings
-
-
-def test_warnings_and_invalid_reliability():
-    r = lqone_bioage(enc_with(lqone_bioage_years=(52, "years")))
-    assert r.status == Status.CALCULATED
-    assert any("модель" in w for w in r.warnings) and any("достоверность" in w for w in r.warnings)
-    bad = lqone_bioage(enc_with(lqone_bioage_years=(52, "years"), lqone_reliability_pct=(140, "%")))
-    assert bad.status == Status.INVALID_INPUT and bad.invalid_fields == ["lqone_reliability_pct"]
+    r = lqone_bioage(enc_with(lqone_bioage_years=(52.4, "years")))
+    assert r.status == Status.CALCULATED and r.value == 52.4 and r.unit == "years"
+    assert not r.warnings and "delta_years" not in r.extra and r.extra["in_model"] is False
+    bad = lqone_bioage(enc_with(lqone_bioage_years=(500, "years")))
+    assert bad.status == Status.INVALID_INPUT and bad.invalid_fields == ["lqone_bioage_years"]
 
 
 def test_not_in_lmb():

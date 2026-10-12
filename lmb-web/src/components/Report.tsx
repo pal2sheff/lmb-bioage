@@ -2,8 +2,9 @@
 // PhenoAge — самостоятельный показатель; сравнения с LMB в отчёте нет (решение владельца 11.10.2026).
 // Методические пояснения — одним компактным блоком в конце (уточнение 11.10.2026, 21:24).
 // Аудит 12.10.2026: диаграмма вкладов; клинические индексы и безразмерные оценки систем — в разных частях.
+import type { ReactNode } from "react";
 import { fmt } from "../api";
-import type { Catalog, IndexRes } from "../types";
+import type { Catalog, IndexRes, MuscleMeasurements } from "../types";
 import { unitRu } from "../units";
 import { BranchContributions, signed } from "./Charts";
 import { AcrSource, DIGITS, DOMAIN_LABEL, type EngineResult, Methodology, reasonsRu } from "./ProfileView";
@@ -71,22 +72,6 @@ export function Report(props: {
               <td className="r num">{pheno?.status === "calculated" ? `${fmt(pheno.value, 1)} лет` : "—"}</td>
               <td>{pheno && pheno.status !== "calculated" ? <StatusBadge status={pheno.status} /> : null}</td>
             </tr>
-            {[["muscle_age", "Мышечный возраст", "модель 0.1-synthetic"], ["lqone_bioage", "Возраст по LQ1", "из отчёта LQ One"]].map(([code, title, sub]) => {
-              const x = idx.get(code);
-              if (!x || x.status === "missing_data") return null;
-              const d = (x.extra as { delta_years?: number | null }).delta_years;
-              return (
-                <tr key={code}>
-                  <td><strong>{title}</strong> <span className="muted small">{sub}</span></td>
-                  <td className="r num">{x.status === "calculated" ? `${fmt(x.value, 1)} лет` : "—"}</td>
-                  <td className="small">
-                    {x.status === "calculated"
-                      ? [d != null ? `разница с календарным ${signed(d, 1)} лет` : null, code === "lqone_bioage" ? lqMeta(x) : null].filter(Boolean).join(" · ")
-                      : <StatusBadge status={x.status} />}
-                  </td>
-                </tr>
-              );
-            })}
           </tbody>
         </table>
       </section>
@@ -105,36 +90,19 @@ export function Report(props: {
             </thead>
             <tbody>
               {catalog.branches.map((b) => {
-                const rows = b.indices.length ? b.indices : [""];
-                return rows.map((code, i) => {
-                  const res = code ? idx.get(code) : undefined;
-                  const label = code ? catalog.index_labels[code] : undefined;
-                  return (
-                    <tr key={b.code + code} className={i === 0 ? "group-start" : ""}>
-                      {i === 0 && (
-                        <td rowSpan={rows.length}>
-                          <strong>{b.name}</strong>
-                        </td>
-                      )}
-                      <td>
-                        {label ? (
-                          <>
-                            {label.short} <span className="muted small">{label.name}</span>
-                            {code === "acr" && res && (
-                              <div>
-                                <AcrSource res={res} />
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <span className="muted">нет подключённых показателей</span>
-                        )}
+                const rows = branchRows(b.code, b.indices, idx, catalog, result.muscle_measurements);
+                return rows.map((row, i) => (
+                  <tr key={b.code + row.key} className={i === 0 ? "group-start" : ""}>
+                    {i === 0 && (
+                      <td rowSpan={rows.length}>
+                        <strong>{b.name}</strong>
                       </td>
-                      <td className="r num">{res ? <ReportValue code={code} res={res} /> : "—"}</td>
-                      <td>{res && res.status !== "calculated" ? <StatusBadge status={res.status} /> : null}</td>
-                    </tr>
-                  );
-                });
+                    )}
+                    <td>{row.label}</td>
+                    <td className="r num">{row.value}</td>
+                    <td>{row.status}</td>
+                  </tr>
+                ));
               })}
               {(catalog.future_branches ?? []).map((b) => (
                 <tr key={b.code} className="group-start">
@@ -142,7 +110,7 @@ export function Report(props: {
                     <strong>{b.name}</strong>
                   </td>
                   <td colSpan={3} className="muted">
-                    в работе: {b.note}
+                    <span className="badge-dev">В работе</span> в расчёт не входит
                   </td>
                 </tr>
               ))}
@@ -206,11 +174,56 @@ export function Report(props: {
   );
 }
 
-function lqMeta(res: IndexRes): string {
-  const e = res.extra as { device_model?: string | null; software_version?: string | null; reliability_pct?: number | null; measured_on?: string | null };
-  return [e.device_model, e.software_version ? `версия ${e.software_version}` : null,
-    e.reliability_pct != null ? `достоверность ${fmt(e.reliability_pct, 1)} %` : null,
-    e.measured_on ? e.measured_on.split("-").reverse().join(".") : null].filter(Boolean).join(" · ");
+interface Row {
+  key: string;
+  label: ReactNode;
+  value: ReactNode;
+  status: ReactNode;
+}
+const kg = (v: number | null | undefined, d = 2) => (v == null ? "—" : `${fmt(v, d)} кг`);
+
+/** Строки ветки в таблице отчёта. Мышечная ветка — исходные данные и ASMI (мышечный возраст — модель
+ *  0.1-synthetic — в отчёт не входит); LQ1 — одна строка «Возраст по LQ1». */
+function branchRows(code: string, indices: string[], idx: Map<string, IndexRes>, catalog: Catalog, m?: MuscleMeasurements): Row[] {
+  const fromIndex = (c: string): Row => {
+    const res = idx.get(c);
+    const label = catalog.index_labels[c];
+    return {
+      key: c,
+      label: label ? (
+        <>
+          {label.short} <span className="muted small">{label.name}</span>
+          {c === "acr" && res && (
+            <div>
+              <AcrSource res={res} />
+            </div>
+          )}
+        </>
+      ) : c,
+      value: res ? <ReportValue code={c} res={res} /> : "—",
+      status: res && res.status !== "calculated" ? <StatusBadge status={res.status} /> : null,
+    };
+  };
+  if (code === "muscle") {
+    const any = m && (m.grip_used_kg != null || m.chair_stand_5x_s != null || m.chair_stand_unable ||
+      [m.visbody_seg_arm_left_kg, m.visbody_seg_arm_right_kg, m.visbody_seg_leg_left_kg, m.visbody_seg_leg_right_kg].some((v) => v != null));
+    if (!any) return [fromIndex("asmi")];
+    const rows: Row[] = [
+      { key: "grip", label: <>Сила хвата <span className="muted small">правая · левая · используемый максимум</span></>,
+        value: `${kg(m?.grip_right_kg, 1)} · ${kg(m?.grip_left_kg, 1)} · ${kg(m?.grip_used_kg, 1)}`, status: null },
+      { key: "chair", label: <>Пять вставаний со стула <span className="muted small">без помощи рук</span></>,
+        value: m?.chair_stand_unable ? "не удалось выполнить" : m?.chair_stand_5x_s != null ? `${fmt(m.chair_stand_5x_s, 1)} с` : "—", status: null },
+      { key: "segments", label: <>Сегменты Visbody <span className="muted small">левая рука · правая рука · левая нога · правая нога</span></>,
+        value: [m?.visbody_seg_arm_left_kg, m?.visbody_seg_arm_right_kg, m?.visbody_seg_leg_left_kg, m?.visbody_seg_leg_right_kg]
+          .map((v) => (v == null ? "—" : fmt(v, 2))).join(" · ") + " кг", status: null },
+      { key: "asm", label: <>ASM и рост <span className="muted small">Visbody, расчёт по четырём сегментам</span></>,
+        value: `${kg(m?.asm_kg)} · ${m?.height_m != null ? `${fmt(m.height_m, 2)} м` : "—"}`, status: null },
+      fromIndex("asmi"),
+    ];
+    return rows;
+  }
+  if (!indices.length) return [{ key: "", label: <span className="muted">нет подключённых показателей</span>, value: "—", status: null }];
+  return indices.map(fromIndex);
 }
 
 /** Значение показателя в отчёте; у FRAX — оба риска и отметка о переносе из официального калькулятора. */

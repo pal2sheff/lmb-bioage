@@ -185,7 +185,13 @@ def run(base: str) -> None:
         step("по нажатию: вклад системы по показателям (Почечный: ACR +1,01, eGFR +0,89), возрастной график показателя, формула индекса")
 
         method = page.locator("#method")
-        method.locator("> summary").click()
+        box = "(() => { const r = document.querySelector('.charts-grid').getBoundingClientRect(); return [r.top + scrollY, r.height]; })()"
+        before = page.evaluate(box)
+        page.get_by_role("button", name="О методике", exact=True).click()
+        expect(method).to_be_visible()
+        after = page.evaluate(box)
+        assert after == before, (before, after)    # панель не сдвигает диаграммы
+        page.screenshot(path=SHOTS / "calc_15_method.png", full_page=False)
         expect(method).to_contain_text("Клиническая валидация не проведена")
         expect(method).to_contain_text("целевая популяция модели не утверждена")
         expect(method).to_contain_text("научный статус: не валидирована")
@@ -203,7 +209,8 @@ def run(base: str) -> None:
         expect(pheno.locator(".figure-value")).to_contain_text("50,1")      # PhenoAge не зависит от режима
         page.get_by_role("switch", name="Расчётная оценка LMB и инфографика").check()
         expect(branches.locator(".dv-row")).to_have_count(7)
-        method.locator("> summary").click()
+        method.get_by_role("button", name="Закрыть").click()
+        expect(method).to_have_count(0)
         step("«О методике»: статус, валидация, область, настройки режима и проверочный расчёт Cardio (+0,319; 57,19); PhenoAge виден всегда")
 
         tab("Данные")
@@ -327,27 +334,22 @@ def run(base: str) -> None:
         expect(review).to_have_count(0)
         step("импорт XLSX (повтор с разными датами — выбрана дата обследования), текстового PDF; скан — сообщение о ручном переносе")
 
-        page.get_by_label("Возраст по LQ1 (из отчёта)", exact=True).fill("52")
-        page.get_by_label("Название показателя в отчёте", exact=True).fill("Биологический возраст")
-        page.get_by_label("Достоверность измерения (LQ One)", exact=True).fill("140")
-        expect(row("Достоверность измерения (LQ One)").locator(".field-error")).to_contain_text("вне допустимого диапазона")
-        page.get_by_label("Достоверность измерения (LQ One)", exact=True).fill("87")
-        page.get_by_label("Модель аппарата", exact=True).fill("LQ One (синтетика)")
-        page.get_by_label("Версия программы", exact=True).fill("1.0")
-        page.get_by_label("Дата измерения", exact=True).fill("2026-10-10")
+        page.get_by_label("Возраст по LQ1", exact=True).fill("52,4")
+        for gone in ("Достоверность измерения (LQ One)", "Модель аппарата", "Версия программы", "Дата измерения",
+                     "Название показателя в отчёте"):
+            expect(page.get_by_label(gone, exact=True)).to_have_count(0)             # одно поле ввода
         tab("Результаты")
         adaptive = page.locator(".branch").filter(has_text="Адаптационный и вегетативный профиль")
-        expect(adaptive.locator(".index-val")).to_contain_text("52")
-        expect(adaptive).to_contain_text("−3,0 к календарному · «Биологический возраст» в отчёте LQ One · аппарат LQ One (синтетика) · версия 1.0 · достоверность 87 %")
+        expect(adaptive.locator(".index-val")).to_have_text("52,4лет")
         lq1 = page.locator(".age-side").filter(has_text="Возраст по LQ1")
-        expect(lq1.locator(".figure-value")).to_contain_text("52")                # передан без изменений
-        expect(lq1).to_contain_text("−3,0 к календарному")
+        expect(lq1.locator(".figure-value")).to_contain_text("52,4")              # передан без изменений
+        expect(lq1).not_to_contain_text("календарн")
         expect(lmb.locator(".bio-value")).to_contain_text("58,6")                 # в LMB не входит
         future = page.locator(".branch.future")
         expect(future).to_contain_text("Респираторный профиль")
-        expect(future).to_contain_text("в работе")
+        expect(future).to_contain_text("В работе")
         expect(page.locator(".branch:not(.future)")).to_have_count(9)
-        step("LQ1: ручной ввод возраста из отчёта (52, −3,0 к календарному), названия, модели, версии, достоверности и даты; в LMB не входит; респираторный профиль — «в работе»")
+        step("LQ1: одно поле «Возраст по LQ1», значение 52,4 передано без изменений, без даты, модели, версии, достоверности и разницы; в LMB не входит; респираторный профиль — «В работе»")
 
         page.locator("section[aria-labelledby=dv-dev]").get_by_role("button", name=re.compile("^SCORE2: Z")).click()
         ticks = [t.replace(",", ".").replace("−", "-") for t in page.locator(".dev-detail .traj-tick").all_text_contents()]
@@ -406,6 +408,9 @@ def run(base: str) -> None:
         main_table = report.locator(".report-table:not(.compact)")
         expect(main_table.locator("thead")).not_to_contain_text("Оценка системы")
         expect(report).to_contain_text("Возраст по LQ1")
+        expect(report.locator(".report-table.compact").first).not_to_contain_text("Мышечный")   # тестовая модель в отчёт не входит
+        expect(report.locator("tr").filter(has_text="Возраст по LQ1")).to_contain_text("52,4 лет")
+        expect(report.locator("tr").filter(has_text="Респираторный профиль")).to_contain_text("В работе")
         expect(report).to_contain_text("Респираторный профиль")
         rtext = report.inner_text()
         assert rtext.count("Клиническая валидация не проведена") == 1, "методика в отчёте повторяется"
@@ -428,17 +433,35 @@ def run(base: str) -> None:
 
         example(3)
         tab("Результаты")
+        mcard = page.locator(".branch").filter(has_text="Мышечный и функциональный профиль")
         muscle = page.locator(".age-side").filter(has_text="Мышечный возраст")
+        expect(mcard).to_contain_text("хват 50 кг (правая 50, левая 48) · 5 вставаний 6 с · ASM 25,75 кг (4 сегмента Visbody)")
+        expect(mcard.locator(".index-line").last).to_contain_text("8,91")
+        expect(muscle).to_have_count(0)                                             # обычный режим: без мышечного возраста
+        expect(mcard).not_to_contain_text("Мышечный возраст")
+        page.screenshot(path=SHOTS / "calc_13_muscle_normal.png", full_page=False)
+        more = page.locator(".gaps-card .more-btn")                                  # длинный список свёрнут
+        expect(more).to_contain_text("Показать ещё")
+        n_before = page.locator(".gaps-card .gap-list li").count()
+        more.click()
+        assert page.locator(".gaps-card .gap-list li").count() > n_before
+        expect(pheno.locator(".short-notes .more-btn")).to_contain_text("ещё")
+        page.get_by_role("button", name="О методике", exact=True).click()
+        page.get_by_role("switch", name="Мышечный возраст (тестирование)").check()
+        page.locator("#method").get_by_role("button", name="Закрыть").click()
         expect(muscle.locator(".figure-value")).to_contain_text("33,7")
         expect(muscle).to_contain_text("−8,3 к календарному")
-        mcard = page.locator(".branch").filter(has_text="Мышечный и функциональный профиль")
-        expect(mcard).to_contain_text("хват 50 кг · 5 вставаний 6 с · ASM 25,75 кг")
-        expect(mcard.locator(".index-line").last).to_contain_text("8,91")
+        expect(muscle).to_contain_text("тест")
         page.screenshot(path=SHOTS / "calc_13_muscle.png", full_page=False)
         tab("Данные")
+        page.get_by_label("Дата рождения", exact=True).fill("1976-01-01")             # те же измерения в 50 лет
+        tab("Результаты")
+        expect(muscle.locator(".figure-value")).to_contain_text("32,7")
+        tab("Данные")
+        page.get_by_label("Дата рождения", exact=True).fill("1984-01-01")
         page.get_by_label("Сила хвата, правая рука", exact=True).fill("40")
         tab("Результаты")
-        expect(muscle.locator(".figure-value")).not_to_contain_text("33,7")
+        expect(muscle.locator(".figure-value")).to_contain_text("35,0")          # хват 48 вместо 50 (42 года)
         weaker = float(muscle.locator(".figure-value").inner_text().split()[0].replace(",", "."))
         assert weaker > 33.7, weaker
         tab("Данные")
@@ -448,19 +471,31 @@ def run(base: str) -> None:
         tab("Результаты")
         expect(muscle).to_contain_text("не рассчитан")
         expect(muscle.locator(".short-notes")).to_contain_text("условное время не подставляется")
-        step(f"мышечный возраст: контрольный пример 33,7 (−8,3); слабее хват → {weaker:.1f}; «не удалось выполнить» — отдельный статус, время не подставляется")
+        expect(mcard).to_contain_text("5 вставаний: не удалось выполнить")
+        tab("Данные")
+        page.get_by_role("radio", name="Мужской").click()
+        page.locator("#c-sex").get_by_role("radio", name="Женский").click()
+        tab("Результаты")
+        expect(muscle.locator(".short-notes")).to_contain_text("для женщин не применяются")
+        expect(mcard.locator(".index-line").last).to_contain_text("8,91")   # измерения сохранены
+        step(f"мышечная ветка: обычный режим — хват, вставания, ASM, ASMI 8,91; тестовый режим — 33,7 (−8,3) в 42 и 32,7 в 50 лет; слабее хват → {weaker:.1f}; «не удалось выполнить» и женский пол — без расчёта")
 
         example(2)
         tab("Данные")
         for label, value in [("Сила хвата, правая рука", "50"), ("Пять вставаний со стула без помощи рук", "6"),
                              ("Visbody: мышцы левой руки", "3,43"), ("Visbody: мышцы правой руки", "3,52"),
-                             ("Visbody: мышцы левой ноги", "9,38"), ("Visbody: мышцы правой ноги", "9,42")]:
+                             ("Visbody: мышцы левой ноги", "9,38"), ("Visbody: мышцы правой ноги", "9,42"),
+                             ("Возраст по LQ1", "45")]:
             page.get_by_label(label, exact=True).fill(value)
         tab("Результаты")
         expect(muscle.locator(".figure-value")).not_to_contain_text("не рассчитан")
-        expect(lmb.locator(".bio-value")).to_contain_text("46,9")                 # мышечный возраст в LMB не входит
+        expect(lmb.locator(".bio-value")).to_contain_text("46,9")                 # мышечный возраст и LQ1 в LMB не входят
         page.screenshot(path=SHOTS / "calc_14_muscle_with_lmb.png", full_page=False)
-        step("мышечный возраст рядом с LMB: итог v0.3 не изменился (46,9) — ветка не включена, повторного учёта нет")
+        page.get_by_role("button", name="О методике", exact=True).click()
+        page.get_by_role("switch", name="Мышечный возраст (тестирование)").uncheck()
+        page.locator("#method").get_by_role("button", name="Закрыть").click()
+        expect(lmb.locator(".bio-value")).to_contain_text("46,9")
+        step("мышечные данные и возраст LQ1 добавлены: LMB не изменился (46,9) в обоих режимах — ветки не включены")
 
         external = [u for u in requests if not u.startswith(base) and not u.startswith("data:") and not u.startswith("blob:")]
         assert not external, f"запросы за пределы сайта: {external[:5]}"

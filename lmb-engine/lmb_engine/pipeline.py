@@ -15,6 +15,7 @@ from .core import Encounter, Status, age_full_years, is_finite_number
 from .consistency import all_issues
 from .experiments import cardio_anchor
 from .indices import run_all
+from .muscle import raw_measurements
 from .model import (ALL_DOMAINS, UNIT_CONVERSIONS, IntegralResult, ZScore, _inverse, attribute, check_config,
                     config_sha256, domain_score, integral, research_integral, trajectory, zscore)
 
@@ -115,6 +116,7 @@ def run(enc: Encounter, config: Mapping, external: Optional[Mapping[str, float]]
         warnings += z.warnings
 
     return {
+        "muscle_measurements": raw_measurements(enc),
         "input_version": snapshot_hash(enc, external),
         "model_version": config.get("version"),
         "model_config_sha256": config_sha256(config),

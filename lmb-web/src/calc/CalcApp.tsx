@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fmt, parseNumber } from "../api";
-import { ProfileView, fieldNames, type EngineResult } from "../components/ProfileView";
+import { ProfileView, fieldNames, openMethod, type EngineResult } from "../components/ProfileView";
 import { Report } from "../components/Report";
 import { Alert, Button, ageOn, dateRu } from "../components/ui";
 import type { Catalog, Definition, IndexRes, QItem } from "../types";
@@ -42,13 +42,6 @@ const DRAFT_KEY = "lmb.calc.draft.v1";
 /** Пункты анкеты, которые показываются не в анкете: источник ACR выбирается рядом с полями ACR. */
 const NOT_IN_QUESTIONNAIRE = new Set(["acr_source", "frax_assumed_no", "lqone_device_model", "lqone_software_version",
   "lqone_measured_on", "lqone_age_name", "chair_stand_result"]);
-/** Сведения об исследовании LQ One — вводятся в разделе «Данные» рядом с показателем. */
-const LQONE_META: [string, string, "text" | "date"][] = [
-  ["lqone_age_name", "Название показателя в отчёте", "text"],
-  ["lqone_device_model", "Модель аппарата", "text"],
-  ["lqone_software_version", "Версия программы", "text"],
-  ["lqone_measured_on", "Дата измерения", "date"],
-];
 /** Поля, у которых есть собственный элемент в форме (для перехода от сообщения). */
 const FIELD_ID: Record<string, string> = {
   birth_date: "c-birth", sex_at_birth: "c-sex", frax_result: "f-major", frax_major_10y_pct: "f-major",
@@ -334,7 +327,6 @@ export function CalcApp() {
       const flags = { ...f.flags };
       for (const it of chosen) {
         values[it.code] = { text: (it.comparator || "") + it.value, unit: it.unit! };
-        if (it.code.startsWith("lqone_") && it.date) flags.lqone_measured_on = it.date;
       }
       return { ...f, values, flags };   // выбор источника ACR и другие ответы не меняются
     });
@@ -425,6 +417,7 @@ export function CalcApp() {
         </nav>
         {engine && result && section === "results" && !report && (
           <div className="tabs-actions no-print">
+            <Button onClick={openMethod}>О методике</Button>
             <Button kind="primary" onClick={() => setReport(true)}>Сформировать отчёт</Button>
           </div>
         )}
@@ -673,19 +666,9 @@ function DataInputs(props: {
             </div>
           )}
           {g.items.some((d) => d.code === "lqone_bioage_years") && (
-            <>
-              {LQONE_META.map(([code, label, kind]) => (
-                <div key={code} className="calc-row" id={`q-${code}`}>
-                  <label htmlFor={`lq-${code}`}>{label}</label>
-                  <input id={`lq-${code}`} type={kind} maxLength={50} value={form.flags[code] ?? ""}
-                    onChange={(e) => setFlag(code, e.target.value)} />
-                </div>
-              ))}
-              <p className="muted small group-note">
-                Значение переносится из заключения LQ One как есть и в LMB BioAge не входит. Отчёт LQ One с текстовым
-                слоем можно загрузить через «Импорт анализов».
-              </p>
-            </>
+            <p className="muted small group-note">
+              Значение из отчёта LQ One вносит врач; оно передаётся без пересчёта и в LMB BioAge не входит.
+            </p>
           )}
           {g.items.some((d) => d.code === "acr_lab") && bothAcr && (
             <div className={acr?.status === "awaiting_review" ? "calc-row q has-error" : "calc-row q"} id="acr-source">
