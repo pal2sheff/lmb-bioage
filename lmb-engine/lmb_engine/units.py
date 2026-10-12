@@ -73,9 +73,18 @@ INPUTS = {d.code: d for d in [
              {"mg/L": _identity, "mg/dL": lambda x: x * 10}, (0.01, 500), {}),
     InputDef("alp", "Щелочная фосфатаза", "U/L", {"U/L": _identity, "IU/L": _identity}, (5, 3000), {}),
     InputDef("visbody_asm", "Масса мышц конечностей (ASM)", "kg", {"kg": _identity}, (5, 60), {}),
+    # Мышечная ветка (задание владельца 12.10.2026): сегменты Visbody, кистевая динамометрия, пять вставаний.
+    # Диапазоны технические — для отсева ошибок ввода.
+    InputDef("visbody_seg_arm_left_kg", "Visbody: мышцы левой руки", "kg", {"kg": _identity}, (0.3, 15), {}),
+    InputDef("visbody_seg_arm_right_kg", "Visbody: мышцы правой руки", "kg", {"kg": _identity}, (0.3, 15), {}),
+    InputDef("visbody_seg_leg_left_kg", "Visbody: мышцы левой ноги", "kg", {"kg": _identity}, (1, 30), {}),
+    InputDef("visbody_seg_leg_right_kg", "Visbody: мышцы правой ноги", "kg", {"kg": _identity}, (1, 30), {}),
+    InputDef("grip_right_kg", "Сила хвата, правая рука", "kg", {"kg": _identity}, (1, 120), {}),
+    InputDef("grip_left_kg", "Сила хвата, левая рука", "kg", {"kg": _identity}, (1, 120), {}),
+    InputDef("chair_stand_5x_s", "Пять вставаний со стула без помощи рук", "s", {"s": _identity}, (2, 120), {}),
     # LQ One — ручной ввод итогового показателя из заключения аппарата (ветка Adaptive, в v0.3 не входит).
     # Диапазоны технические; порог достоверности не утверждён (docs/device_mapping.md).
-    InputDef("lqone_bioage_years", "Биологический возраст (LQ One)", "years", {"years": _identity}, (1, 120), {}),
+    InputDef("lqone_bioage_years", "Возраст по LQ1 (из отчёта)", "years", {"years": _identity}, (1, 120), {}),
     InputDef("lqone_reliability_pct", "Достоверность измерения (LQ One)", "%", {"%": _identity}, (0, 100), {}),
     # МПК только шейки бедра (позвоночник и общий проксимальный отдел не подставляются)
     InputDef("fn_tscore", "T-показатель шейки бедра (референс NHANES III)", "SD", {"SD": _identity}, (-6, 6), {}),

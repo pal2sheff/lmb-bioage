@@ -5,7 +5,7 @@ import { Report } from "../components/Report";
 import { Alert, Button, ageOn, dateRu } from "../components/ui";
 import type { Catalog, Definition, IndexRes, QItem } from "../types";
 import { unitRu } from "../units";
-import { EXAMPLE, EXAMPLE_YOUNGER } from "./example";
+import { EXAMPLE, EXAMPLE_MUSCLE, EXAMPLE_YOUNGER } from "./example";
 import { loadEngine, type CalcCase, type Engine, type LabImport, type LabItem } from "./engine";
 import { readLabFile } from "./labfile";
 
@@ -41,9 +41,10 @@ const FILE_FORMAT = "lmb-bioage-case";
 const DRAFT_KEY = "lmb.calc.draft.v1";
 /** Пункты анкеты, которые показываются не в анкете: источник ACR выбирается рядом с полями ACR. */
 const NOT_IN_QUESTIONNAIRE = new Set(["acr_source", "frax_assumed_no", "lqone_device_model", "lqone_software_version",
-  "lqone_measured_on"]);
+  "lqone_measured_on", "lqone_age_name", "chair_stand_result"]);
 /** Сведения об исследовании LQ One — вводятся в разделе «Данные» рядом с показателем. */
 const LQONE_META: [string, string, "text" | "date"][] = [
+  ["lqone_age_name", "Название показателя в отчёте", "text"],
   ["lqone_device_model", "Модель аппарата", "text"],
   ["lqone_software_version", "Версия программы", "text"],
   ["lqone_measured_on", "Дата измерения", "date"],
@@ -53,6 +54,7 @@ const FIELD_ID: Record<string, string> = {
   birth_date: "c-birth", sex_at_birth: "c-sex", frax_result: "f-major", frax_major_10y_pct: "f-major",
   frax_hip_10y_pct: "f-hip", acr_source: "acr-source", lqone_device_model: "q-lqone_device_model",
   lqone_software_version: "q-lqone_software_version", lqone_measured_on: "q-lqone_measured_on",
+  lqone_age_name: "q-lqone_age_name", chair_stand_result: "q-chair_stand_result",
 };
 
 /** Приведение формы из файла или черновика: берутся только известные поля (устаревшие игнорируются). */
@@ -394,6 +396,9 @@ export function CalcApp() {
                 <button type="button" onClick={(e) => { loadExample(EXAMPLE_YOUNGER, "моложе паспортного"); (e.currentTarget.closest("details") as HTMLDetailsElement).open = false; }}>
                   Пример 2: моложе паспортного
                 </button>
+                <button type="button" onClick={(e) => { loadExample(EXAMPLE_MUSCLE, "мышечный возраст (контрольный)"); (e.currentTarget.closest("details") as HTMLDetailsElement).open = false; }}>
+                  Пример 3: мышечный возраст (контрольный)
+                </button>
               </div>
             </details>
           )}
@@ -646,11 +651,26 @@ function DataInputs(props: {
               </div>
             );
           })}
-          {g.items.some((d) => d.code === "visbody_asm") && (
+          {g.items.some((d) => d.code === "visbody_seg_arm_left_kg") && (
             <p className="muted small group-note">
-              Масса мышц конечностей (ASM) — значение из отчёта аппарата. SMM и сумма сегментов Visbody не подставляются:
-              соответствие не подтверждено спецификацией аппарата.
+              ASM = сумма четырёх сегментов конечностей (туловище не входит; SMM не подставляется). Источник — «Visbody,
+              расчёт по четырём сегментам».
             </p>
+          )}
+          {g.items.some((d) => d.code === "chair_stand_5x_s") && (
+            <div className="calc-row q" id="q-chair_stand_result">
+              <span>Пять вставаний без помощи рук</span>
+              <Segmented
+                label="Пять вставаний без помощи рук"
+                value={form.flags.chair_stand_result ?? ""}
+                options={[
+                  ["completed", "Выполнено"],
+                  ["unable", "Не удалось выполнить"],
+                ]}
+                onChange={(v) => setFlag("chair_stand_result", form.flags.chair_stand_result === v ? "" : v)}
+              />
+              <FieldError list={errors.get("chair_stand_result")} />
+            </div>
           )}
           {g.items.some((d) => d.code === "lqone_bioage_years") && (
             <>

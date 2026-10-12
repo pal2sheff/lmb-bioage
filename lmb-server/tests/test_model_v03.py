@@ -156,3 +156,23 @@ def test_lqone_via_server(world):
     assert defs["lqone_bioage_years"]["in_model_inputs"] is False
     cat = ui_catalog(observation_definitions())
     assert [b["code"] for b in cat["future_branches"]] == ["respiratory"] and len(cat["branches"]) == 9
+
+
+
+def test_muscle_age_via_server(world):
+    """Мышечный возраст (миграция 0010): контрольный пример владельца через сервер; в LMB не входит."""
+    d = world["doctor_a"]
+    pt = d.post("/patients", json={**PATIENT, "birth_date": "1984-01-01", "sex_at_birth": "male"})
+    assert pt.status_code in (200, 201), pt.text
+    eid = d.post(f"/patients/{pt.json()['id']}/encounters", json={"encounter_date": "2026-10-10"}).json()["id"]
+    for code, v, u in [("height_cm", 170, "cm"), ("grip_right_kg", 50, "kg"), ("grip_left_kg", 48, "kg"),
+                       ("chair_stand_5x_s", 6, "s"), ("visbody_seg_arm_left_kg", 3.43, "kg"),
+                       ("visbody_seg_arm_right_kg", 3.52, "kg"), ("visbody_seg_leg_left_kg", 9.38, "kg"),
+                       ("visbody_seg_leg_right_kg", 9.42, "kg")]:
+        r = d.post(f"/encounters/{eid}/observations", json={"code": code, "value": v, "unit": u})
+        assert r.status_code == 201, r.text
+    assert d.put(f"/encounters/{eid}/questionnaire", json={"answers": {"chair_stand_result": "completed"}}).status_code == 200
+    res = d.post(f"/encounters/{eid}/calculations", json={}).json()["result"]
+    ma = next(i for i in res["indices"] if i["code"] == "muscle_age")
+    assert ma["status"] == "calculated" and abs(ma["value"] - 33.69123935891594) < 1e-9
+    assert next(x for x in res["domains"] if x["domain"] == "muscle")["contribution"] is None

@@ -18,7 +18,7 @@ export type GoTo = (code: string) => void;
 
 export const DIGITS: Record<string, number> = {
   caide: 0, egfr_ckdepi_cr_2021: 0, bmi: 1, score2: 1, score2_op: 1, frax_kz: 1, sii: 0, whtr: 3, aip: 3, tyg: 2,
-  phenoage: 1,
+  phenoage: 1, muscle_age: 1, lqone_bioage: 1,
 };
 export const DOMAIN_LABEL: Record<string, string> = {
   calculated: "рассчитана",
@@ -47,7 +47,8 @@ const FORMULA: Record<string, string> = {
   frax_kz: "Результат официального калькулятора FRAX, модель Казахстана; приложение FRAX не рассчитывает",
   asmi: "ASMI = масса мышц конечностей / рост²",
   phenoage: "Levine 2018 (поправка PLoS Med 2019): альбумин, креатинин, глюкоза, вч-СРБ, лимфоциты %, MCV, RDW, ЩФ, лейкоциты, возраст",
-  lqone_bioage: "Показатель из заключения аппарата LQ One («Биологический возраст», годы) — ручной ввод; алгоритм аппарата не воспроизводится, в LMB BioAge не входит. Порог достоверности и правила адаптационного профиля не утверждены",
+  lqone_bioage: "Готовое значение возраста из оригинального отчёта LQ One, годы, без пересчёта; алгоритм аппарата не воспроизводится. В LMB BioAge пока не входит: вес не утверждён. Порог достоверности не утверждён",
+  muscle_age: "Мышечный возраст = A + P − P_ref(A); P = 67,0445 − 0,6524·G + 23,8986·ln(T) − 4,7645·ASMI (G — максимум хвата, кг; T — пять вставаний, с; ASMI — ASM/рост², ASM — сумма 4 сегментов Visbody). Модель 0.1-synthetic: мужчины 20–89 лет, не валидирована; в LMB BioAge пока не входит",
 };
 /** SCORE2 и SCORE2-OP взаимоисключающие по возрасту: неприменимость второго при рассчитанном первом — не ограничение. */
 const PARTNER: Record<string, string> = { score2: "score2_op", score2_op: "score2" };
@@ -107,11 +108,22 @@ export function ProfileView({ result, catalog, meta, goTo }: { result: EngineRes
   const names = fieldNames(catalog);
   const r = research ? result.research ?? null : null;
   const delta = r?.status === "calculated" ? r.delta_years : null;
+  // мышечный возраст и возраст LQ1 — рядом с PhenoAge, когда для них что-то внесено
+  const side = AGE_CARDS.filter((c) => {
+    const x = idx.get(c);
+    if (!x) return false;
+    if (x.status !== "missing_data") return true;
+    const inputs = AGE_INPUTS[c];
+    return x.missing_fields.length < inputs.length && inputs.some((f) => !x.missing_fields.includes(f));
+  });
   return (
     <>
-      <div className="summary-grid">
+      <div className={`summary-grid side-${side.length}`}>
         <AgeSummary result={result} catalog={catalog} research={research} />
         <PhenoAgeCard res={idx.get("phenoage")} names={names} goTo={goTo} />
+        {side.map((c) => (
+          <DeviceAgeCard key={c} code={c} res={idx.get(c)!} names={names} goTo={goTo} />
+        ))}
       </div>
 
       {r ? (
@@ -221,6 +233,42 @@ function AgeSummary({ result, catalog, research }: { result: EngineResult; catal
           <span className="figure-value empty">—</span>
         )}
       </div>
+    </section>
+  );
+}
+
+const AGE_CARDS = ["muscle_age", "lqone_bioage"];
+const AGE_TITLE: Record<string, string> = { muscle_age: "Мышечный возраст", lqone_bioage: "Возраст по LQ1" };
+/** Входы, по которым видно, что исследование вносили (карточка появляется, даже если чего-то не хватает). */
+const AGE_INPUTS: Record<string, string[]> = {
+  muscle_age: ["grip_right_kg", "grip_left_kg", "chair_stand_5x_s", "visbody_seg_arm_left_kg", "visbody_seg_arm_right_kg",
+    "visbody_seg_leg_left_kg", "visbody_seg_leg_right_kg"],
+  lqone_bioage: ["lqone_bioage_years"],
+};
+
+/** Мышечный возраст и возраст LQ1: значение с одним знаком и разница с календарным возрастом. */
+function DeviceAgeCard({ code, res, names, goTo }: { code: string; res: IndexRes; names: Record<string, string>; goTo?: GoTo }) {
+  const ok = res.status === "calculated" && res.value !== null;
+  const d = (res.extra as { delta_years?: number | null }).delta_years;
+  return (
+    <section className="pheno-card age-side" aria-label={AGE_TITLE[code]}>
+      <span className="eyebrow">
+        <span>{AGE_TITLE[code]}</span>
+        <Info label={AGE_TITLE[code]}>
+          <span>{FORMULA[code]}</span>
+        </Info>
+      </span>
+      {ok ? (
+        <span className="figure-value num">
+          {fmt(res.value, 1)} <span className="figure-unit">лет</span>
+        </span>
+      ) : (
+        <span className="figure-value empty">не рассчитан</span>
+      )}
+      {ok && d != null && (
+        <span className={`delta ${d > 0 ? "up" : d < 0 ? "down" : ""}`}>{signed(d, 1)} к календарному</span>
+      )}
+      {!ok && <ShortNotes res={res} names={names} goTo={goTo} />}
     </section>
   );
 }
@@ -426,16 +474,32 @@ function IndexBlock({ code, res, idx, catalog, names, goTo }: {
       </div>
       {code === "acr" && <AcrSource res={res} />}
       {code === "lqone_bioage" && show && <LqOneMeta res={res} />}
+      {code === "muscle_age" && <MuscleMeta res={res} />}
       <IndexNotes res={shown} names={names} goTo={goTo} />
     </div>
   );
 }
 
+/** Исходные данные мышечного возраста: хват, вставания, ASM. */
+function MuscleMeta({ res }: { res: IndexRes }) {
+  const e = res.extra as { grip_used_kg?: number | null; chair_stand_s?: number | null; chair_stand_unable?: boolean;
+    asm_kg?: number | null; delta_years?: number | null };
+  const parts = [
+    e.delta_years != null ? `${signed(e.delta_years, 1)} к календарному` : null,
+    e.grip_used_kg != null ? `хват ${fmt(e.grip_used_kg, 1)} кг` : null,
+    e.chair_stand_unable ? "вставания: не удалось выполнить" : e.chair_stand_s != null ? `5 вставаний ${fmt(e.chair_stand_s, 1)} с` : null,
+    e.asm_kg != null ? `ASM ${fmt(e.asm_kg, 2)} кг` : null,
+  ].filter(Boolean);
+  return parts.length ? <span className="index-expl">{parts.join(" · ")}</span> : null;
+}
+
 /** Сведения об исследовании LQ One: модель, версия, достоверность, дата. */
 function LqOneMeta({ res }: { res: IndexRes }) {
-  const e = res.extra as { device_model?: string | null; software_version?: string | null; reliability_pct?: number | null; measured_on?: string | null };
+  const e = res.extra as { device_model?: string | null; software_version?: string | null; reliability_pct?: number | null;
+    measured_on?: string | null; original_name?: string | null; delta_years?: number | null };
   const parts = [
-    "по заключению LQ One",
+    e.delta_years != null ? `${signed(e.delta_years, 1)} к календарному` : null,
+    e.original_name ? `«${e.original_name}» в отчёте LQ One` : "из отчёта LQ One",
     e.device_model ? `аппарат ${e.device_model}` : null,
     e.software_version ? `версия ${e.software_version}` : null,
     e.reliability_pct != null ? `достоверность ${fmt(e.reliability_pct, 1)} %` : null,
@@ -517,7 +581,7 @@ function details(code: string, res: IndexRes): string[] {
 /** Ограничения и недостающие данные: по полям, с переходом к полю; без повторов. */
 function GapsCard({ result, catalog, names, goTo }: { result: EngineResult; catalog: Catalog; names: Record<string, string>; goTo?: GoTo }) {
   const label = (c: string) => catalog.index_labels[c]?.short ?? c;
-  const skip = new Set(["asmi", "lqone_bioage"]);   // показатели аппаратов необязательны — не «недостающие данные»
+  const skip = new Set(["asmi", "lqone_bioage", "muscle_age"]);   // показатели аппаратов необязательны — не «недостающие данные»
   const missing = new Map<string, string[]>();
   const invalid: { msg: string; fields: string[] }[] = [];
   const review: string[] = [];
@@ -623,9 +687,12 @@ export function Methodology({ result, catalog, extra, settings }: {
           факторах, поэтому вклад Cardio завышен и растёт с возрастом. Замена — после данных целевой популяции.
         </li>
         <li>
-          Показатели аппаратов (LQ One, Visbody) отображаются как в отчёте аппарата и в LMB BioAge не входят. Правила
-          адаптационного профиля и порог достоверности LQ One не утверждены; соответствие показателя Visbody массе мышц
-          конечностей спецификацией не подтверждено. Респираторный профиль — в работе.
+          Мышечный возраст — модель владельца 0.1-synthetic (коэффициенты подобраны на синтетических данных, клиническая
+          валидация не проведена; только мужчины 20–89 лет): A + P − P_ref(A) по максимальной силе хвата, времени пяти
+          вставаний и ASMI; ASM — сумма четырёх сегментов конечностей Visbody. «Возраст по LQ1» — готовое значение из
+          отчёта LQ One без пересчёта. Оба показываются отдельно и в LMB BioAge пока не входят: веса не утверждены
+          (предложение — docs/muscle_lq1_integration_proposal.md). Порог достоверности LQ One не утверждён.
+          Респираторный профиль — в работе.
         </li>
         <li>Изменение оценки между визитами не означает доказанного лечебного эффекта.</li>
         <li>PhenoAge — самостоятельный показатель (Levine 2018, поправка 2019), в LMB BioAge не входит.</li>

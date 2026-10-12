@@ -12,6 +12,9 @@ UNITS = {
     "ast": "U/L", "alt": "U/L", "platelets": "10^9/L", "neutrophils_abs": "10^9/L",
     "lymphocytes_abs": "10^9/L", "visbody_asm": "kg", "sbp_mmhg": "mmHg",
     "wbc": "10^9/L", "mcv": "fL", "rdw": "%", "albumin_serum": "g/L", "crp": "mg/L", "alp": "U/L",
+    "visbody_seg_arm_left_kg": "kg", "visbody_seg_arm_right_kg": "kg", "visbody_seg_leg_left_kg": "kg",
+    "visbody_seg_leg_right_kg": "kg", "grip_right_kg": "kg", "grip_left_kg": "kg", "chair_stand_5x_s": "s",
+    "lqone_bioage_years": "years", "lqone_reliability_pct": "%",
 }
 
 CLEAN_FLAGS = {"fasting_status": "yes", "insulin_therapy": "no", "diabetes": "no",

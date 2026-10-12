@@ -36,6 +36,7 @@ export const UNIT_RU: Record<string, string> = {
   "g/L": "г/л",
   "g/dL": "г/дл",
   years: "лет",
+  s: "с",
 };
 
 export const unitRu = (u: string | null | undefined) => (u ? UNIT_RU[u] ?? u : "");

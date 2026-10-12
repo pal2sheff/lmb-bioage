@@ -16,6 +16,7 @@ from .core import Encounter, IndexResult, Sex, Status, Tri
 from .cardio import score2, score2_op
 from .consistency import acr_lab_mg_mmol, cbc_issue, frax_issue
 from .gate import Gate
+from .muscle import asmi, muscle_age
 from .units import ACR_MGMMOL_TO_MGG, CREATININE_UMOL_PER_MGDL, GLUCOSE_MMOL_TO_MGDL, TG_MMOL_TO_MGDL
 
 ADULT_AGE = 18
@@ -42,27 +43,15 @@ def whtr(enc: Encounter) -> IndexResult:
     return g.result(waist / h, "ratio")
 
 
-def asmi(enc: Encounter) -> IndexResult:
-    """ASMI только из массы мышц конечностей отчёта аппарата; SMM не используется."""
-    g = Gate(enc, "asmi", 1)
-    asm = g.value("visbody_asm")
-    h = g.value("height_cm")
-    if g.blocked():
-        return g.result()
-    # сумма сегментов Visbody как ASM не подставляется: соответствие не подтверждено спецификацией аппарата
-    g.warnings.append("Масса мышц конечностей введена вручную; соответствие показателя Visbody массе мышц "
-                      "конечностей спецификацией аппарата не подтверждено")
-    return g.result(asm / (h / 100) ** 2, "kg/m2", {"asm_source": "manual"})
-
-
 # ---------------------------------------------------------------- Adaptive (LQ One)
 def lqone_bioage(enc: Encounter) -> IndexResult:
-    """Итоговый показатель заключения LQ One «Биологический возраст», годы — как в отчёте аппарата.
+    """«Возраст по LQ1» — готовое значение возраста из оригинального отчёта LQ One, годы, без пересчёта.
 
-    Только отображение: внутренний алгоритм LQ One не воспроизводится, в LMB v0.3 не входит,
-    правила расчёта адаптационного профиля не утверждены.
+    Внутренний алгоритм LQ One не воспроизводится; в LMB v0.3 не входит (ветка Adaptive — not_included,
+    вес не утверждён); разница с календарным возрастом — только для отображения.
     """
     g = Gate(enc, "lqone_bioage", 1)
+    age = g.age()
     v = g.value("lqone_bioage_years")
     rel = g.optional("lqone_reliability_pct")
     if g.blocked():
@@ -76,8 +65,10 @@ def lqone_bioage(enc: Encounter) -> IndexResult:
         g.warnings.append("Не указана достоверность измерения LQ One")
     if measured and measured != enc.encounter_date.isoformat():
         g.warnings.append(f"Измерение LQ One от {'.'.join(reversed(measured.split('-')))} — не в дату обследования")
+    name = (enc.flags.get("lqone_age_name") or "").strip() or None
     return g.result(v, "years", {
-        "source": "LQ One, ручной ввод из заключения", "original_name": "Биологический возраст",
+        "source": "LQ One, оригинальный отчёт", "original_name": name, "calendar_age": age,
+        "delta_years": v - age if age is not None else None,
         "device_model": model, "software_version": version, "measured_on": measured, "reliability_pct": rel,
         "reliability_threshold": None, "in_model": False})
 
@@ -478,7 +469,7 @@ def phenoage(enc: Encounter, params: dict = None) -> IndexResult:
 
 
 REGISTRY = {
-    "bmi": bmi, "whtr": whtr, "asmi": asmi, "lqone_bioage": lqone_bioage,
+    "bmi": bmi, "whtr": whtr, "asmi": asmi, "muscle_age": muscle_age, "lqone_bioage": lqone_bioage,
     "homa_ir": homa_ir, "tyg": tyg, "aip": aip, "non_hdl": non_hdl,
     "egfr_ckdepi_cr_2021": egfr_ckdepi_cr_2021, "acr": acr,
     "fib4": fib4, "nlr": nlr, "sii": sii,
