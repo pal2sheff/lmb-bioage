@@ -44,10 +44,13 @@ QUESTIONNAIRE_ITEMS = {
     "lqone_device_model": ("Модель аппарата LQ One", None),
     "lqone_software_version": ("Версия программы LQ One", None),
     "lqone_measured_on": ("Дата измерения LQ One", "date"),
+    "lqone_age_name": ("Название показателя возраста в отчёте LQ1", None),
+    # мышечная ветка (задание владельца 12.10.2026): невозможность теста — отдельный ответ, время не подставляется
+    "chair_stand_result": ("Пять вставаний со стула без помощи рук", ("completed", "unable", "unknown")),
 }
 
 # Пункты, которые подтверждает только врач (пациент может ответить «не знаю»)
-DOCTOR_ONLY_ITEMS = {"acr_source", "lqone_device_model", "lqone_software_version", "lqone_measured_on", "ascvd", "ckd_known", "fh", "very_high_single_risk_factor", "acute_kidney_change",
+DOCTOR_ONLY_ITEMS = {"acr_source", "lqone_age_name", "chair_stand_result", "lqone_device_model", "lqone_software_version", "lqone_measured_on", "ascvd", "ckd_known", "fh", "very_high_single_risk_factor", "acute_kidney_change",
                      "creatinine_idms", "acute_liver_condition", "acute_infection", "frax_assumed_no",
                      "secondary_osteoporosis", "rheumatoid_arthritis"}
 FRAX_RISK_FACTORS = ("prior_fragility_fracture", "parent_hip_fracture", "smoking_current", "glucocorticoids",
@@ -86,7 +89,9 @@ def validate_answer(code: str, value: str) -> str | None:
 # входы только PhenoAge (самостоятельный показатель): хранятся, но в LMB v0.3 не входят
 CONTROL_ONLY_INPUTS = ("wbc", "mcv", "rdw", "albumin_serum", "crp", "alp")
 # показатели аппаратов, которые только отображаются (в LMB v0.3 не входят)
-DEVICE_DISPLAY_INPUTS = ("lqone_bioage_years", "lqone_reliability_pct")
+DEVICE_DISPLAY_INPUTS = ("lqone_bioage_years", "lqone_reliability_pct", "visbody_seg_arm_left_kg",
+                         "visbody_seg_arm_right_kg", "visbody_seg_leg_left_kg", "visbody_seg_leg_right_kg",
+                         "grip_right_kg", "grip_left_kg", "chair_stand_5x_s")
 
 
 def observation_definitions() -> list[dict]:
@@ -113,8 +118,10 @@ OBSERVATION_GROUPS = [
     ("Общий анализ крови", ["platelets", "neutrophils_abs", "lymphocytes_abs", "wbc", "mcv", "rdw"]),
     ("Дополнительные показатели для PhenoAge", ["albumin_serum", "crp", "alp"]),
     ("Минеральная плотность шейки бедра", ["fn_tscore", "fn_bmd"]),
-    ("Мышцы (Visbody)", ["visbody_asm"]),
-    ("LQ One — заключение аппарата", ["lqone_bioage_years", "lqone_reliability_pct"]),
+    ("Мышцы и функция", ["grip_right_kg", "grip_left_kg", "chair_stand_5x_s"]),
+    ("Visbody — мышцы конечностей", ["visbody_seg_arm_left_kg", "visbody_seg_arm_right_kg",
+                                     "visbody_seg_leg_left_kg", "visbody_seg_leg_right_kg"]),
+    ("LQ One — отчёт аппарата", ["lqone_bioage_years", "lqone_reliability_pct"]),
 ]
 
 QUESTIONNAIRE_GROUPS = [
@@ -124,7 +131,8 @@ QUESTIONNAIRE_GROUPS = [
     ("Образ жизни и образование", ["smoking_current", "alcohol_3plus", "physical_activity_caide", "education_years"]),
     ("Факторы FRAX", ["prior_fragility_fracture", "parent_hip_fracture", "glucocorticoids", "rheumatoid_arthritis",
                       "secondary_osteoporosis", "fn_bmd_device_make", "frax_assumed_no"]),
-    ("LQ One", ["lqone_device_model", "lqone_software_version", "lqone_measured_on"]),
+    ("Мышцы и функция", ["chair_stand_result"]),
+    ("LQ One", ["lqone_age_name", "lqone_device_model", "lqone_software_version", "lqone_measured_on"]),
 ]
 
 INDEX_LABELS = {
@@ -143,9 +151,10 @@ INDEX_LABELS = {
     "sii": ("SII", "Индекс системного иммунного воспаления"),
     "caide": ("CAIDE", "20-летний риск деменции, баллы"),
     "frax_kz": ("FRAX", "10-летний риск переломов, модель Казахстана"),
-    "asmi": ("ASMI", "Индекс мышечной массы конечностей"),
+    "asmi": ("ASMI", "Индекс мышц конечностей: ASM (4 сегмента Visbody) / рост²"),
+    "muscle_age": ("Мышечный возраст", "Модель 0.1-synthetic: сила хвата, пять вставаний, ASMI"),
     "phenoage": ("PhenoAge", "Фенотипический возраст (Levine 2018)"),
-    "lqone_bioage": ("LQ One", "Биологический возраст по заключению LQ One"),
+    "lqone_bioage": ("Возраст по LQ1", "Готовое значение возраста из отчёта LQ One"),
 }
 
 BRANCHES = [
@@ -156,7 +165,7 @@ BRANCHES = [
     ("inflammation", "Inflammation", "Воспалительный профиль", ["nlr", "sii"]),
     ("brain", "Brain", "Когнитивно-сосудистый профиль", ["caide"]),
     ("bone", "Bone", "Профиль риска переломов", ["frax_kz"]),
-    ("muscle", "Muscle / Functional", "Мышечный и функциональный профиль", ["asmi"]),
+    ("muscle", "Muscle / Functional", "Мышечный и функциональный профиль", ["muscle_age", "asmi"]),
     ("adaptive", "Adaptive / Autonomic", "Адаптационный и вегетативный профиль", ["lqone_bioage"]),
 ]
 

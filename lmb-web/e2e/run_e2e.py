@@ -225,7 +225,7 @@ def run_browser() -> None:
         expect(card).to_contain_text("не рассчитан")                                # 66 лет: вне области 40–64
         expect(card.locator(".why")).to_contain_text("вне технической области тестирования 40–64")
         assert "Клинический итог" not in page.locator("main").inner_text()        # статус — в «О методике»
-        pheno = page.locator(".pheno-card")                                         # самостоятельный показатель
+        pheno = page.locator(".pheno-card:not(.age-side)")                                         # самостоятельный показатель
         expect(pheno).to_contain_text("не рассчитан")                               # нет входов PhenoAge
         expect(pheno.locator(".short-notes")).to_contain_text("не хватает")
         expect(page.locator("main")).not_to_contain_text("LMB − PhenoAge")

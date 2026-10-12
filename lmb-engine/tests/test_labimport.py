@@ -178,3 +178,13 @@ def test_pdf_row_without_cell_border():
                                     "АЛТ\t20\tЕд/л"]), ENC)
     assert one(r, "alp")["value"] == "78" and one(r, "alp")["unit"] == "U/L"
     assert one(r, "alt")["value"] == "20"
+
+
+def test_lqone_several_ages_require_choice():
+    lines = ["Результаты автоматической интерпретации стрессовой нагрузки", "Достоверность измерения 87 %",
+             "Геронтологическая кривая", "Календарный возраст, лет 50", "Биологический возраст, лет 52",
+             "Функциональный возраст, лет 48", "Отклонение биологического возраста, лет 2"]
+    r = candidates(rows_from_lines(lines), ENC)
+    ages = by_code(r, "lqone_bioage_years")
+    assert sorted(i["value"] for i in ages) == ["48", "52"]                  # календарный и отклонение — не оценки
+    assert not any(i["selected"] for i in ages) and all("выберите" in i["duplicate"] for i in ages)

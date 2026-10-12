@@ -1,6 +1,6 @@
 """LQ One: ручной ввод итогового показателя заключения — только отображение, в LMB v0.3 не входит."""
 from lmb_engine.core import Measurement, Status
-from lmb_engine.indices import asmi, lqone_bioage
+from lmb_engine.indices import lqone_bioage
 from lmb_engine.model import config_path, load_config
 from lmb_engine.pipeline import run
 
@@ -38,9 +38,3 @@ def test_not_in_lmb():
     assert base["research"]["bioage_years"] == withlq["research"]["bioage_years"]
     adaptive = next(d for d in withlq["domains"] if d["domain"] == "adaptive")
     assert adaptive["status"] == "not_included" and adaptive["contribution"] is None
-
-
-def test_asmi_source_warning():
-    r = asmi(enc_with(visbody_asm=(18, "kg")))
-    assert r.status == Status.CALCULATED and r.extra["asm_source"] == "manual"
-    assert any("спецификацией аппарата не подтверждено" in w for w in r.warnings)

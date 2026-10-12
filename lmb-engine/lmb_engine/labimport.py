@@ -90,7 +90,7 @@ _RULES = [
     ("lymphocytes_abs", r"лимфоцит|\blym", r"атипичн|реактивн|нейтроф|субпопул|\bcd\d|/"),
     ("crp", r"[сc]-?реактивн|\bсрб\b|\bcrp\b|hs-?crp|вч-?срб", None),
     ("alp", r"щелочн\w*\s+фосфатаз|\bщф\b|\balp\b|\balkp\b", r"костн"),
-    ("lqone_bioage_years", r"биологическ\w*\s+возраст", r"отклонени"),
+    ("lqone_bioage_years", r"возраст", r"отклонени|календарн|паспортн|^возраст\W*$|^возраст\W*(лет|год)"),
     ("lqone_reliability_pct", r"достоверност\w*\s+измерени", None),
 ]
 _LQONE_MARK = r"lq\s*one|lq1|геронтологическ|достоверност\w*\s+измерени|стрессов\w* нагрузк"
@@ -402,6 +402,13 @@ def candidates(rows: list, encounter_date: Optional[dt.date] = None) -> dict:
         for it in group:
             it["alternative"] = it is not best
             it["selected"] = it is best and it["status"] == "ok" and it["transferable"]
+        if code == "lqone_bioage_years" and len({it["name"] for it in group}) > 1:
+            # в отчёте несколько возрастных оценок: поле выбирает врач
+            for it in group:
+                it["selected"] = False
+                it["alternative"] = False
+                it["duplicate"] = "в отчёте несколько возрастных показателей — выберите нужный"
+            continue
         values = {(it["comparator"], it["value"], it["unit"]) for it in group}
         dates = {it["date"] for it in group}
         if len(group) > 1:

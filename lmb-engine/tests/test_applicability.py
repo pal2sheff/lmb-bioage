@@ -207,10 +207,13 @@ def test_acr_single_source_used_and_named():
     assert missing.status == Status.MISSING_DATA and missing.missing_fields == ["acr_lab"]
 
 
-def test_asmi_needs_asm_not_smm():
+def test_asmi_needs_four_limb_segments_not_smm():
+    """ASM — сумма четырёх сегментов конечностей Visbody (решение владельца 12.10.2026); прежнее поле ASM не используется."""
     assert ix.asmi(enc(height_cm=175)).status == Status.MISSING_DATA
-    r = ix.asmi(enc(height_cm=175, visbody_asm=22))
-    assert r.value == 22 / 1.75 ** 2
+    assert ix.asmi(enc(height_cm=175, visbody_asm=22)).status == Status.MISSING_DATA
+    r = ix.asmi(enc(height_cm=175, visbody_seg_arm_left_kg=3, visbody_seg_arm_right_kg=3, visbody_seg_leg_left_kg=8,
+                    visbody_seg_leg_right_kg=8))
+    assert r.value == 22 / 1.75 ** 2 and r.extra["asm_source"] == "Visbody, расчёт по четырём сегментам"
 
 
 def test_run_all_isolated(monkeypatch):

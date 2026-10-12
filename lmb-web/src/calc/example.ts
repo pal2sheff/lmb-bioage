@@ -78,3 +78,22 @@ export const EXAMPLE_YOUNGER: FormState = {
   },
   frax: { major: "3,1", hip: "0,3", with_bmd: "no" },
 };
+
+/** Контрольный пример мышечного возраста из задания владельца 12.10.2026 (мужчина 42 года): ожидается 33,7 года. */
+export const EXAMPLE_MUSCLE: FormState = {
+  birth_date: "1984-01-01",
+  encounter_date: "2026-10-10",
+  sex: "male",
+  values: {
+    height_cm: v("170", "cm"),
+    grip_right_kg: v("50", "kg"),
+    grip_left_kg: v("48", "kg"),
+    chair_stand_5x_s: v("6", "s"),
+    visbody_seg_arm_left_kg: v("3,43", "kg"),
+    visbody_seg_arm_right_kg: v("3,52", "kg"),
+    visbody_seg_leg_left_kg: v("9,38", "kg"),
+    visbody_seg_leg_right_kg: v("9,42", "kg"),
+  },
+  flags: { chair_stand_result: "completed" },
+  frax: { major: "", hip: "", with_bmd: "" },
+};

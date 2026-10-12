@@ -25,7 +25,6 @@ export function Report(props: {
   const r = result.research;
   const rOk = research && r?.status === "calculated" && r.bioage_years !== null;
   const pheno = idx.get("phenoage");
-  const lq = idx.get("lqone_bioage");
   const lmbNote = !research ? "расчёт выключен" : rOk ? "" : r ? `не рассчитан${r.reasons.length ? `: ${reasonsRu(r.reasons, catalog).slice(0, 2).join("; ")}` : ""}` : "";
   return (
     <article className="report">
@@ -72,13 +71,22 @@ export function Report(props: {
               <td className="r num">{pheno?.status === "calculated" ? `${fmt(pheno.value, 1)} лет` : "—"}</td>
               <td>{pheno && pheno.status !== "calculated" ? <StatusBadge status={pheno.status} /> : null}</td>
             </tr>
-            {lq?.status === "calculated" && (
-              <tr>
-                <td><strong>Биологический возраст LQ One</strong> <span className="muted small">по заключению аппарата</span></td>
-                <td className="r num">{fmt(lq.value, 1)} лет</td>
-                <td className="small">{lqMeta(lq)}</td>
-              </tr>
-            )}
+            {[["muscle_age", "Мышечный возраст", "модель 0.1-synthetic"], ["lqone_bioage", "Возраст по LQ1", "из отчёта LQ One"]].map(([code, title, sub]) => {
+              const x = idx.get(code);
+              if (!x || x.status === "missing_data") return null;
+              const d = (x.extra as { delta_years?: number | null }).delta_years;
+              return (
+                <tr key={code}>
+                  <td><strong>{title}</strong> <span className="muted small">{sub}</span></td>
+                  <td className="r num">{x.status === "calculated" ? `${fmt(x.value, 1)} лет` : "—"}</td>
+                  <td className="small">
+                    {x.status === "calculated"
+                      ? [d != null ? `разница с календарным ${signed(d, 1)} лет` : null, code === "lqone_bioage" ? lqMeta(x) : null].filter(Boolean).join(" · ")
+                      : <StatusBadge status={x.status} />}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </section>
