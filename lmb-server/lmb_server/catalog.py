@@ -40,17 +40,12 @@ QUESTIONNAIRE_ITEMS = {
     # источник ACR при наличии готового и расчётного значения (аудит 11.10.2026): выбирает врач
     "acr_source": ("Источник ACR для расчёта", ("lab", "calculated", "unknown")),
     "frax_assumed_no": ("Факторы FRAX, отмеченные врачом «нет — сведений нет»", "frax_list"),
-    # LQ One: сведения об исследовании для итогового показателя заключения (аудит 12.10.2026)
-    "lqone_device_model": ("Модель аппарата LQ One", None),
-    "lqone_software_version": ("Версия программы LQ One", None),
-    "lqone_measured_on": ("Дата измерения LQ One", "date"),
-    "lqone_age_name": ("Название показателя возраста в отчёте LQ1", None),
     # мышечная ветка (задание владельца 12.10.2026): невозможность теста — отдельный ответ, время не подставляется
     "chair_stand_result": ("Пять вставаний со стула без помощи рук", ("completed", "unable", "unknown")),
 }
 
 # Пункты, которые подтверждает только врач (пациент может ответить «не знаю»)
-DOCTOR_ONLY_ITEMS = {"acr_source", "lqone_age_name", "chair_stand_result", "lqone_device_model", "lqone_software_version", "lqone_measured_on", "ascvd", "ckd_known", "fh", "very_high_single_risk_factor", "acute_kidney_change",
+DOCTOR_ONLY_ITEMS = {"acr_source", "chair_stand_result", "ascvd", "ckd_known", "fh", "very_high_single_risk_factor", "acute_kidney_change",
                      "creatinine_idms", "acute_liver_condition", "acute_infection", "frax_assumed_no",
                      "secondary_osteoporosis", "rheumatoid_arthritis"}
 FRAX_RISK_FACTORS = ("prior_fragility_fracture", "parent_hip_fracture", "smoking_current", "glucocorticoids",
@@ -121,7 +116,7 @@ OBSERVATION_GROUPS = [
     ("Мышцы и функция", ["grip_right_kg", "grip_left_kg", "chair_stand_5x_s"]),
     ("Visbody — мышцы конечностей", ["visbody_seg_arm_left_kg", "visbody_seg_arm_right_kg",
                                      "visbody_seg_leg_left_kg", "visbody_seg_leg_right_kg"]),
-    ("LQ One — отчёт аппарата", ["lqone_bioage_years", "lqone_reliability_pct"]),
+    ("LQ One", ["lqone_bioage_years"]),
 ]
 
 QUESTIONNAIRE_GROUPS = [
@@ -132,7 +127,6 @@ QUESTIONNAIRE_GROUPS = [
     ("Факторы FRAX", ["prior_fragility_fracture", "parent_hip_fracture", "glucocorticoids", "rheumatoid_arthritis",
                       "secondary_osteoporosis", "fn_bmd_device_make", "frax_assumed_no"]),
     ("Мышцы и функция", ["chair_stand_result"]),
-    ("LQ One", ["lqone_age_name", "lqone_device_model", "lqone_software_version", "lqone_measured_on"]),
 ]
 
 INDEX_LABELS = {
@@ -154,7 +148,7 @@ INDEX_LABELS = {
     "asmi": ("ASMI", "Индекс мышц конечностей: ASM (4 сегмента Visbody) / рост²"),
     "muscle_age": ("Мышечный возраст", "Модель 0.1-synthetic: сила хвата, пять вставаний, ASMI"),
     "phenoage": ("PhenoAge", "Фенотипический возраст (Levine 2018)"),
-    "lqone_bioage": ("Возраст по LQ1", "Готовое значение возраста из отчёта LQ One"),
+    "lqone_bioage": ("Возраст по LQ1", "Значение из отчёта LQ One, внесённое врачом"),
 }
 
 BRANCHES = [
@@ -173,7 +167,7 @@ BRANCHES = [
 # Не входят в девять текущих веток и в LMB; методика и ввод не подключены.
 FUTURE_BRANCHES = [
     ("respiratory", "Respiratory", "Респираторный профиль",
-     "Спирометрия (FEV1, FVC, FEV1/FVC) с уравнениями GLI — методика и ввод готовятся; в расчёт не входит."),
+     "В работе: спирометрия (FEV1, FVC, FEV1/FVC), методика и ввод готовятся; в расчёт не входит."),
 ]
 
 

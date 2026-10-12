@@ -127,3 +127,27 @@ def muscle_age(enc: Encounter, params: Optional[dict] = None) -> IndexResult:
     return g.result(out["muscle_age"], "years", {**measured, "p": out["p"], "p_ref": out["p_ref"],
                                                   "delta_years": out["delta_years"], "reference": out["ref"],
                                                   "age_basis": p["age_basis"]})
+
+
+def raw_measurements(enc: Encounter) -> dict:
+    """Исходные данные мышечной ветки для экрана и отчёта (независимо от статуса мышечного возраста).
+
+    Значения — в канонических единицах; ошибочные (вне технического диапазона) не показываются как данные.
+    """
+    g = Gate(enc, "muscle_raw", 1)
+
+    def val(k):
+        try:
+            return g.optional(k)
+        except Exception:      # noqa: BLE001 — сводка не должна ломать расчёт
+            return None
+    out = {k: val(k) for k in ("grip_right_kg", "grip_left_kg", "chair_stand_5x_s", "height_cm", *SEGMENTS)}
+    grips = [v for v in (out["grip_right_kg"], out["grip_left_kg"]) if v is not None]
+    out["grip_used_kg"] = max(grips) if grips else None
+    out["chair_stand_unable"] = (enc.flags.get("chair_stand_result") or "") == "unable"
+    seg = [out[k] for k in SEGMENTS]
+    out["asm_kg"] = math.fsum(seg) if all(v is not None for v in seg) else None
+    out["height_m"] = out["height_cm"] / 100 if out["height_cm"] is not None else None
+    out["asmi_kg_m2"] = out["asm_kg"] / out["height_m"] ** 2 if out["asm_kg"] is not None and out["height_m"] else None
+    out["asm_source"] = ASM_SOURCE
+    return out

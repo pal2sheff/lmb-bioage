@@ -45,32 +45,17 @@ def whtr(enc: Encounter) -> IndexResult:
 
 # ---------------------------------------------------------------- Adaptive (LQ One)
 def lqone_bioage(enc: Encounter) -> IndexResult:
-    """«Возраст по LQ1» — готовое значение возраста из оригинального отчёта LQ One, годы, без пересчёта.
+    """«Возраст по LQ1» — значение, внесённое врачом из отчёта LQ One, годы; передаётся без пересчёта.
 
-    Внутренний алгоритм LQ One не воспроизводится; в LMB v0.3 не входит (ветка Adaptive — not_included,
-    вес не утверждён); разница с календарным возрастом — только для отображения.
+    Решение владельца 12.10.2026, 22:05: одно поле ввода; достоверность обеспечивает врач при внесении;
+    дата, модель, версия, достоверность и разница с календарным возрастом не хранятся и не показываются.
+    Внутренний алгоритм LQ One не воспроизводится; в LMB v0.3 не входит (Adaptive — not_included).
     """
-    g = Gate(enc, "lqone_bioage", 1)
-    age = g.age()
+    g = Gate(enc, "lqone_bioage", 2)
     v = g.value("lqone_bioage_years")
-    rel = g.optional("lqone_reliability_pct")
     if g.blocked():
         return g.result()
-    model = (enc.flags.get("lqone_device_model") or "").strip() or None
-    version = (enc.flags.get("lqone_software_version") or "").strip() or None
-    measured = (enc.flags.get("lqone_measured_on") or "").strip() or None
-    if not model or not version:
-        g.warnings.append("Не указаны модель аппарата и версия программы LQ One")
-    if rel is None:
-        g.warnings.append("Не указана достоверность измерения LQ One")
-    if measured and measured != enc.encounter_date.isoformat():
-        g.warnings.append(f"Измерение LQ One от {'.'.join(reversed(measured.split('-')))} — не в дату обследования")
-    name = (enc.flags.get("lqone_age_name") or "").strip() or None
-    return g.result(v, "years", {
-        "source": "LQ One, оригинальный отчёт", "original_name": name, "calendar_age": age,
-        "delta_years": v - age if age is not None else None,
-        "device_model": model, "software_version": version, "measured_on": measured, "reliability_pct": rel,
-        "reliability_threshold": None, "in_model": False})
+    return g.result(v, "years", {"source": "LQ One, значение внесено врачом", "in_model": False})
 
 
 # ---------------------------------------------------------------- Metabolic

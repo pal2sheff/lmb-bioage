@@ -515,3 +515,20 @@ button.dev-row:hover, .dev-item.open > .dev-row { background: var(--hover); }
 .branch.future h3 { color: var(--ink-2); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .badge-dev { font-size: 12px; font-weight: 700; color: var(--review); border: 1px solid currentColor; border-radius: 99px;
   padding: 1px 8px; }
+
+/* — итоговое задание 12.10.2026, 22:05: всплывающие пояснения не сдвигают карточки — */
+details.info { position: relative; }
+details.info > .info-body { position: absolute; z-index: 40; top: 26px; left: -8px; width: min(320px, 78vw); margin: 0;
+  background: var(--card); border: 1px solid var(--rule); box-shadow: 0 10px 28px rgba(32, 40, 45, 0.16); }
+.index-name details.info, .index-name > details.info:not([open]) { flex-basis: auto; order: 0; }
+.pheno-card details.info > .info-body { left: auto; right: -8px; }
+.drawer-backdrop { position: fixed; inset: 0; z-index: 60; background: rgba(32, 40, 45, 0.28); display: flex;
+  justify-content: flex-end; }
+.method-drawer { width: min(560px, 100vw); height: 100%; overflow-y: auto; background: var(--card); padding: 20px 24px 32px;
+  box-shadow: -12px 0 32px rgba(32, 40, 45, 0.18); }
+.drawer-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
+.drawer-head h2 { font-size: 20px; }
+.method-drawer .method-body { margin-top: 8px; }
+.more-btn { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; font-size: 13px; font-weight: 600;
+  cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.muscle-raw { margin: 0; }

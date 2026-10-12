@@ -91,7 +91,6 @@ _RULES = [
     ("crp", r"[сc]-?реактивн|\bсрб\b|\bcrp\b|hs-?crp|вч-?срб", None),
     ("alp", r"щелочн\w*\s+фосфатаз|\bщф\b|\balp\b|\balkp\b", r"костн"),
     ("lqone_bioage_years", r"возраст", r"отклонени|календарн|паспортн|^возраст\W*$|^возраст\W*(лет|год)"),
-    ("lqone_reliability_pct", r"достоверност\w*\s+измерени", None),
 ]
 _LQONE_MARK = r"lq\s*one|lq1|геронтологическ|достоверност\w*\s+измерени|стрессов\w* нагрузк"
 _PCT_FIELDS = ("neutrophils_abs", "lymphocytes_abs")
@@ -365,8 +364,6 @@ def candidates(rows: list, encounter_date: Optional[dt.date] = None) -> dict:
                 unit = "%"
         if code == "lqone_bioage_years" and unit is None:
             unit = "years"          # «Биологический возраст, лет» — единица в названии строки отчёта
-        if code == "lqone_reliability_pct" and unit is None:
-            unit = "%"
         if code == "creatinine_serum" and unit == "mmol/L":
             status, reason = "check", "единица ммоль/л характерна для креатинина мочи — проверьте материал"
         if code == "albumin_serum" and unit == "mg/L":

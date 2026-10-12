@@ -229,9 +229,11 @@ def run_browser() -> None:
         expect(pheno).to_contain_text("не рассчитан")                               # нет входов PhenoAge
         expect(pheno.locator(".short-notes")).to_contain_text("не хватает")
         expect(page.locator("main")).not_to_contain_text("LMB − PhenoAge")
-        page.locator("#method > summary").click()
+        page.get_by_role("button", name="О методике", exact=True).click()
         expect(page.locator("#method")).to_contain_text("Клинический итог не рассчитан")
         expect(page.locator("#method")).to_contain_text("Редакция модели")
+        page.keyboard.press("Escape")
+        expect(page.locator("#method")).to_have_count(0)
         page.get_by_role("button", name="Проверить воспроизводимость").click()
         expect(page.get_by_text("результат совпадает полностью")).to_be_visible()
         page.wait_for_timeout(800)  # дождаться анимации появления карточек

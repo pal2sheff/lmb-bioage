@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, idem } from "../api";
 import { useSession } from "../session";
 import type { Run } from "../types";
-import { ProfileView } from "./ProfileView";
+import { openMethod, ProfileView } from "./ProfileView";
 import { Alert, Button, dateRu } from "./ui";
 
 export function Profile({ encounterId }: { encounterId: string }) {
@@ -52,6 +52,7 @@ export function Profile({ encounterId }: { encounterId: string }) {
           )}
         </div>
         <div className="row">
+          {run && <Button onClick={openMethod}>О методике</Button>}
           {run && <Button onClick={() => void reproduce()}>Проверить воспроизводимость</Button>}
           <Button kind="primary" onClick={() => void calculate()} disabled={busy}>
             {busy ? "Считаем…" : "Рассчитать по текущим данным"}

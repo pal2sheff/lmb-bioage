@@ -58,3 +58,39 @@ export function useCardioCheck(): [boolean, (v: boolean) => void] {
   };
   return [on, set];
 }
+
+const MUSCLE_KEY = "lmb.muscleTest";
+
+/** Мышечный возраст (модель 0.1-synthetic) — только в режиме тестирования, по умолчанию выключен
+ *  (решение владельца 12.10.2026, 22:05). В обычном режиме показываются исходные измерения и ASMI. */
+export function useMuscleTest(): [boolean, (v: boolean) => void] {
+  const [on, setOn] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem(MUSCLE_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const set = (v: boolean) => {
+    setOn(v);
+    try {
+      window.localStorage.setItem(MUSCLE_KEY, v ? "1" : "0");
+    } catch {
+      /* хранилище недоступно */
+    }
+  };
+  return [on, set];
+}
+
+export function MuscleTestToggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="research-toggle no-print">
+      <span className="switch">
+        <input type="checkbox" role="switch" checked={on} onChange={(e) => onChange(e.target.checked)}
+          aria-label="Мышечный возраст (тестирование)" />
+        <span />
+      </span>
+      Мышечный возраст (тестирование, модель 0.1-synthetic)
+    </label>
+  );
+}

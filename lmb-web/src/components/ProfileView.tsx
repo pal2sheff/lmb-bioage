@@ -1,9 +1,9 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { fmt } from "../api";
-import type { CardioAnchor, Catalog, IndexRes, Run } from "../types";
+import type { CardioAnchor, Catalog, IndexRes, MuscleMeasurements, Run } from "../types";
 import { unitRu } from "../units";
 import { BranchContributions, DeviationChart, signed } from "./Charts";
-import { ResearchToggle, useCardioCheck, useResearchMode } from "./TestMode";
+import { MuscleTestToggle, ResearchToggle, useCardioCheck, useMuscleTest, useResearchMode } from "./TestMode";
 import { StatusBadge } from "./ui";
 
 /** Результат расчётного модуля (pipeline.run) — одинаковый у сервера и браузерного калькулятора. */
@@ -18,7 +18,7 @@ export type GoTo = (code: string) => void;
 
 export const DIGITS: Record<string, number> = {
   caide: 0, egfr_ckdepi_cr_2021: 0, bmi: 1, score2: 1, score2_op: 1, frax_kz: 1, sii: 0, whtr: 3, aip: 3, tyg: 2,
-  phenoage: 1, muscle_age: 1, lqone_bioage: 1,
+  phenoage: 1, muscle_age: 1, lqone_bioage: 2,
 };
 export const DOMAIN_LABEL: Record<string, string> = {
   calculated: "рассчитана",
@@ -45,10 +45,10 @@ const FORMULA: Record<string, string> = {
   sii: "SII = тромбоциты × нейтрофилы / лимфоциты",
   caide: "CAIDE, модель 1 без APOE (Kivipelto 2006), 39–64 года",
   frax_kz: "Результат официального калькулятора FRAX, модель Казахстана; приложение FRAX не рассчитывает",
-  asmi: "ASMI = масса мышц конечностей / рост²",
+  asmi: "ASMI = ASM / рост², кг/м²; ASM = левая рука + правая рука + левая нога + правая нога (сегменты Visbody, туловище не входит); источник «Visbody, расчёт по четырём сегментам»",
   phenoage: "Levine 2018 (поправка PLoS Med 2019): альбумин, креатинин, глюкоза, вч-СРБ, лимфоциты %, MCV, RDW, ЩФ, лейкоциты, возраст",
-  lqone_bioage: "Готовое значение возраста из оригинального отчёта LQ One, годы, без пересчёта; алгоритм аппарата не воспроизводится. В LMB BioAge пока не входит: вес не утверждён. Порог достоверности не утверждён",
-  muscle_age: "Мышечный возраст = A + P − P_ref(A); P = 67,0445 − 0,6524·G + 23,8986·ln(T) − 4,7645·ASMI (G — максимум хвата, кг; T — пять вставаний, с; ASMI — ASM/рост², ASM — сумма 4 сегментов Visbody). Модель 0.1-synthetic: мужчины 20–89 лет, не валидирована; в LMB BioAge пока не входит",
+  lqone_bioage: "Значение из отчёта LQ One, годы, внесённое врачом, без пересчёта; алгоритм аппарата не воспроизводится. В LMB BioAge не входит",
+  muscle_age: "Мышечный возраст = A + P − P_ref(A); P = 67,0445 − 0,6524·G + 23,8986·ln(T) − 4,7645·ASMI (G — максимум хвата, кг; T — пять вставаний, с; ASMI — ASM/рост², ASM — сумма 4 сегментов Visbody). Тестовая модель 0.1-synthetic: коэффициенты и ориентиры владельца без описания происхождения; мужчины 20–89 лет; не подтверждена; в LMB BioAge не входит",
 };
 /** SCORE2 и SCORE2-OP взаимоисключающие по возрасту: неприменимость второго при рассчитанном первом — не ограничение. */
 const PARTNER: Record<string, string> = { score2: "score2_op", score2_op: "score2" };
@@ -105,6 +105,13 @@ export function FieldLinks({ codes, names, goTo }: { codes: string[]; names: Rec
 export function ProfileView({ result, catalog, meta, goTo }: { result: EngineResult; catalog: Catalog; meta?: ReactNode; goTo?: GoTo }) {
   const idx = new Map(result.indices.map((i) => [i.code, i]));
   const [research, setResearch] = useResearchMode();
+  const [muscleTest, setMuscleTest] = useMuscleTest();
+  const [method, setMethod] = useState(false);
+  useEffect(() => {
+    const open = () => setMethod(true);
+    window.addEventListener(METHOD_EVENT, open);
+    return () => window.removeEventListener(METHOD_EVENT, open);
+  }, []);
   const names = fieldNames(catalog);
   const r = research ? result.research ?? null : null;
   const delta = r?.status === "calculated" ? r.delta_years : null;
@@ -112,6 +119,7 @@ export function ProfileView({ result, catalog, meta, goTo }: { result: EngineRes
   const side = AGE_CARDS.filter((c) => {
     const x = idx.get(c);
     if (!x) return false;
+    if (c === "muscle_age" && !muscleTest) return false;    // модель 0.1-synthetic — только в режиме тестирования
     if (x.status !== "missing_data") return true;
     const inputs = AGE_INPUTS[c];
     return x.missing_fields.length < inputs.length && inputs.some((f) => !x.missing_fields.includes(f));
@@ -141,12 +149,14 @@ export function ProfileView({ result, catalog, meta, goTo }: { result: EngineRes
       <h2 className="section-title results-title">Показатели по системам</h2>
       <div className="branch-grid">
         {catalog.branches.map((b) => (
-          <SystemCard key={b.code} name={b.name} indices={b.indices} idx={idx} catalog={catalog} names={names} goTo={goTo} />
+          <SystemCard key={b.code} name={b.name} indices={b.indices.filter((c) => c !== "muscle_age" || muscleTest)} idx={idx}
+            catalog={catalog} names={names} goTo={goTo}
+            extra={b.code === "muscle" ? <MuscleRaw m={result.muscle_measurements} /> : undefined} />
         ))}
         {(catalog.future_branches ?? []).map((b) => (
           <article key={b.code} className="branch future" aria-label={b.name}>
             <h3>
-              {b.name} <span className="badge-dev">в работе</span>
+              {b.name} <span className="badge-dev">В работе</span>
             </h3>
             <p className="index-expl">{b.note}</p>
           </article>
@@ -155,28 +165,62 @@ export function ProfileView({ result, catalog, meta, goTo }: { result: EngineRes
 
       <GapsCard result={result} catalog={catalog} names={names} goTo={goTo} />
 
-      <details className="more details-card method" id="method">
-        <summary>О методике</summary>
-        <Methodology result={result} catalog={catalog} extra={meta}
-          settings={
-            <>
-              {result.research && <ResearchToggle on={research} onChange={setResearch} />}
-              {research && result.research?.cardio_anchor_experiment && (
-                <CardioCheck x={result.research.cardio_anchor_experiment} result={result} />
-              )}
-            </>
-          } />
-      </details>
+      {method && (
+        <MethodDrawer onClose={() => setMethod(false)}>
+          <Methodology result={result} catalog={catalog} extra={meta}
+            settings={
+              <>
+                {result.research && <ResearchToggle on={research} onChange={setResearch} />}
+                <MuscleTestToggle on={muscleTest} onChange={setMuscleTest} />
+                {research && result.research?.cardio_anchor_experiment && (
+                  <CardioCheck x={result.research.cardio_anchor_experiment} result={result} />
+                )}
+              </>
+            } />
+        </MethodDrawer>
+      )}
     </>
   );
 }
 
-/** Открыть «О методике» и прокрутить к нему. */
-function openMethod() {
-  const el = document.getElementById("method") as HTMLDetailsElement | null;
-  if (!el) return;
-  el.open = true;
-  el.scrollIntoView({ behavior: "smooth", block: "start" });
+const METHOD_EVENT = "lmb:open-method";
+/** Открыть панель «О методике» (поверх экрана: карточки и диаграммы не сдвигаются). */
+export function openMethod() {
+  window.dispatchEvent(new Event(METHOD_EVENT));
+}
+
+/** Всплывающая панель справа; закрывается кнопкой, Esc или щелчком по затемнению. */
+function MethodDrawer({ onClose, children }: { onClose: () => void; children: ReactNode }) {
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [onClose]);
+  return (
+    <div className="drawer-backdrop no-print" onClick={onClose}>
+      <aside className="method-drawer" role="dialog" aria-modal="true" aria-labelledby="method-title" id="method"
+        onClick={(e) => e.stopPropagation()}>
+        <header className="drawer-head">
+          <h2 id="method-title">О методике</h2>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onClose} autoFocus>Закрыть</button>
+        </header>
+        {children}
+      </aside>
+    </div>
+  );
+}
+
+/** Исходные данные мышечной ветки — показываются всегда (мышечный возраст — только в режиме тестирования). */
+function MuscleRaw({ m }: { m?: MuscleMeasurements }) {
+  if (!m) return null;
+  const has = m.grip_used_kg != null || m.chair_stand_5x_s != null || m.chair_stand_unable || m.asm_kg != null;
+  if (!has) return null;
+  const parts = [
+    m.grip_used_kg != null ? `хват ${fmt(m.grip_used_kg, 1)} кг (правая ${fmt(m.grip_right_kg, 1)}, левая ${fmt(m.grip_left_kg, 1)})` : null,
+    m.chair_stand_unable ? "5 вставаний: не удалось выполнить" : m.chair_stand_5x_s != null ? `5 вставаний ${fmt(m.chair_stand_5x_s, 1)} с` : null,
+    m.asm_kg != null ? `ASM ${fmt(m.asm_kg, 2)} кг (4 сегмента Visbody)` : null,
+  ].filter(Boolean);
+  return <p className="index-expl muscle-raw">{parts.join(" · ")}</p>;
 }
 function toGaps() {
   document.getElementById("gaps-title")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -246,26 +290,27 @@ const AGE_INPUTS: Record<string, string[]> = {
   lqone_bioage: ["lqone_bioage_years"],
 };
 
-/** Мышечный возраст и возраст LQ1: значение с одним знаком и разница с календарным возрастом. */
+/** Мышечный возраст (режим тестирования; с разницей с календарным) и возраст по LQ1 (только значение). */
 function DeviceAgeCard({ code, res, names, goTo }: { code: string; res: IndexRes; names: Record<string, string>; goTo?: GoTo }) {
   const ok = res.status === "calculated" && res.value !== null;
   const d = (res.extra as { delta_years?: number | null }).delta_years;
   return (
     <section className="pheno-card age-side" aria-label={AGE_TITLE[code]}>
       <span className="eyebrow">
-        <span>{AGE_TITLE[code]}</span>
+          <span>{AGE_TITLE[code]}</span>
+        {code === "muscle_age" && <span className="badge-dev">тест</span>}
         <Info label={AGE_TITLE[code]}>
           <span>{FORMULA[code]}</span>
         </Info>
       </span>
       {ok ? (
         <span className="figure-value num">
-          {fmt(res.value, 1)} <span className="figure-unit">лет</span>
+          {code === "muscle_age" ? fixed1(res.value!) : fmt(res.value, 2)} <span className="figure-unit">лет</span>
         </span>
       ) : (
         <span className="figure-value empty">не рассчитан</span>
       )}
-      {ok && d != null && (
+      {ok && d != null && code === "muscle_age" && (
         <span className={`delta ${d > 0 ? "up" : d < 0 ? "down" : ""}`}>{signed(d, 1)} к календарному</span>
       )}
       {!ok && <ShortNotes res={res} names={names} goTo={goTo} />}
@@ -273,10 +318,23 @@ function DeviceAgeCard({ code, res, names, goTo }: { code: string; res: IndexRes
   );
 }
 
+/** Один десятичный знак всегда (33,7; 35,0). */
+const fixed1 = (v: number) => v.toLocaleString("ru-RU", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
 /** Кнопка информации: формулы, источники и пояснения — по нажатию. */
 export function Info({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <details className="info">
+    <details className="info" onToggle={(e) => {
+      const d = e.currentTarget;
+      if (!d.open) return;
+      const close = (ev: MouseEvent) => {
+        if (!d.contains(ev.target as Node)) {
+          d.open = false;
+          document.removeEventListener("click", close);
+        }
+      };
+      setTimeout(() => document.addEventListener("click", close), 0);
+    }}>
       <summary aria-label={`Подробнее: ${label}`} title="Подробнее">i</summary>
       <div className="info-body">{children}</div>
     </details>
@@ -381,8 +439,9 @@ function CardioCheck({ x, result }: { x: CardioAnchor; result: EngineResult }) {
 
 function SystemCard(props: {
   name: string; indices: string[]; idx: Map<string, IndexRes>; catalog: Catalog; names: Record<string, string>; goTo?: GoTo;
+  extra?: ReactNode;
 }) {
-  const { name, indices, idx, catalog, names, goTo } = props;
+  const { name, indices, idx, catalog, names, goTo, extra } = props;
   return (
     <article className="branch" aria-label={name}>
       <h3>{name}</h3>
@@ -390,6 +449,7 @@ function SystemCard(props: {
       {indices.map((c) => (
         <IndexBlock key={c} code={c} res={idx.get(c)} idx={idx} catalog={catalog} names={names} goTo={goTo} />
       ))}
+      {extra}
     </article>
   );
 }
@@ -465,7 +525,7 @@ function IndexBlock({ code, res, idx, catalog, names, goTo }: {
         <span className="index-name"><strong>{label?.short ?? code}</strong>{info}</span>
         {show ? (
           <span className="index-val num">
-            {fmt(res.value, DIGITS[code] ?? 2)}
+            {code === "muscle_age" ? fixed1(res.value!) : fmt(res.value, DIGITS[code] ?? 2)}
             {unit && <span className="unit">{unit}</span>}
           </span>
         ) : (
@@ -473,39 +533,20 @@ function IndexBlock({ code, res, idx, catalog, names, goTo }: {
         )}
       </div>
       {code === "acr" && <AcrSource res={res} />}
-      {code === "lqone_bioage" && show && <LqOneMeta res={res} />}
       {code === "muscle_age" && <MuscleMeta res={res} />}
       <IndexNotes res={shown} names={names} goTo={goTo} />
     </div>
   );
 }
 
-/** Исходные данные мышечного возраста: хват, вставания, ASM. */
+/** Мышечный возраст (режим тестирования): разница с календарным и отметка модели. */
 function MuscleMeta({ res }: { res: IndexRes }) {
-  const e = res.extra as { grip_used_kg?: number | null; chair_stand_s?: number | null; chair_stand_unable?: boolean;
-    asm_kg?: number | null; delta_years?: number | null };
-  const parts = [
-    e.delta_years != null ? `${signed(e.delta_years, 1)} к календарному` : null,
-    e.grip_used_kg != null ? `хват ${fmt(e.grip_used_kg, 1)} кг` : null,
-    e.chair_stand_unable ? "вставания: не удалось выполнить" : e.chair_stand_s != null ? `5 вставаний ${fmt(e.chair_stand_s, 1)} с` : null,
-    e.asm_kg != null ? `ASM ${fmt(e.asm_kg, 2)} кг` : null,
-  ].filter(Boolean);
-  return parts.length ? <span className="index-expl">{parts.join(" · ")}</span> : null;
-}
-
-/** Сведения об исследовании LQ One: модель, версия, достоверность, дата. */
-function LqOneMeta({ res }: { res: IndexRes }) {
-  const e = res.extra as { device_model?: string | null; software_version?: string | null; reliability_pct?: number | null;
-    measured_on?: string | null; original_name?: string | null; delta_years?: number | null };
-  const parts = [
-    e.delta_years != null ? `${signed(e.delta_years, 1)} к календарному` : null,
-    e.original_name ? `«${e.original_name}» в отчёте LQ One` : "из отчёта LQ One",
-    e.device_model ? `аппарат ${e.device_model}` : null,
-    e.software_version ? `версия ${e.software_version}` : null,
-    e.reliability_pct != null ? `достоверность ${fmt(e.reliability_pct, 1)} %` : null,
-    e.measured_on ? e.measured_on.split("-").reverse().join(".") : null,
-  ].filter(Boolean);
-  return <span className="index-expl">{parts.join(" · ")}</span>;
+  const d = (res.extra as { delta_years?: number | null }).delta_years;
+  return (
+    <span className="index-expl">
+      {d != null ? `${signed(d, 1)} к календарному · ` : ""}тестовая модель 0.1-synthetic, не подтверждена
+    </span>
+  );
 }
 
 const ACR_SOURCE_RU: Record<string, string> = { lab: "готовый ACR лаборатории", calculated: "расчёт по альбумину и креатинину мочи" };
@@ -538,12 +579,24 @@ function ShortNotes({ res, names, goTo }: { res: IndexRes; names: Record<string,
         ))}
       {res.missing_fields.length > 0 && (
         <li className="sn-missing">
-          не хватает: <FieldLinks codes={res.missing_fields} names={names} goTo={goTo} />
+          не хватает: <Collapsible codes={res.missing_fields} names={names} goTo={goTo} />
         </li>
       )}
       {(res.status === "not_applicable" || res.status === "awaiting_review") &&
         res.reasons.map((r) => <li key={r} className="sn-na">{r}</li>)}
     </ul>
+  );
+}
+
+/** Длинный перечень полей сворачивается: первые три видны, остальные — по нажатию. */
+function Collapsible({ codes, names, goTo, limit = 3 }: { codes: string[]; names: Record<string, string>; goTo?: GoTo; limit?: number }) {
+  const [all, setAll] = useState(false);
+  if (codes.length <= limit + 1 || all) return <FieldLinks codes={codes} names={names} goTo={goTo} />;
+  return (
+    <>
+      <FieldLinks codes={codes.slice(0, limit)} names={names} goTo={goTo} />{" "}
+      <button type="button" className="more-btn" onClick={() => setAll(true)}>ещё {codes.length - limit}</button>
+    </>
   );
 }
 
@@ -633,14 +686,7 @@ function GapsCard({ result, catalog, names, goTo }: { result: EngineResult; cata
       {missing.size > 0 && (
         <>
           <h3>Не хватает данных</h3>
-          <ul className="gap-list">
-            {[...missing.entries()].map(([f, by]) => (
-              <li key={f}>
-                <FieldLinks codes={[f]} names={names} goTo={goTo} />
-                <span className="muted small"> — нужно для: {[...new Set(by)].join(", ")}</span>
-              </li>
-            ))}
-          </ul>
+          <MissingList entries={[...missing.entries()]} names={names} goTo={goTo} />
         </>
       )}
       {limits.length > 0 && (
@@ -687,12 +733,12 @@ export function Methodology({ result, catalog, extra, settings }: {
           факторах, поэтому вклад Cardio завышен и растёт с возрастом. Замена — после данных целевой популяции.
         </li>
         <li>
-          Мышечный возраст — модель владельца 0.1-synthetic (коэффициенты подобраны на синтетических данных, клиническая
-          валидация не проведена; только мужчины 20–89 лет): A + P − P_ref(A) по максимальной силе хвата, времени пяти
-          вставаний и ASMI; ASM — сумма четырёх сегментов конечностей Visbody. «Возраст по LQ1» — готовое значение из
-          отчёта LQ One без пересчёта. Оба показываются отдельно и в LMB BioAge пока не входят: веса не утверждены
-          (предложение — docs/muscle_lq1_integration_proposal.md). Порог достоверности LQ One не утверждён.
-          Респираторный профиль — в работе.
+          Мышечная ветка: сила хвата (максимум двух рук), пять вставаний и ASMI = ASM / рост², где ASM — сумма
+          четырёх сегментов конечностей Visbody (туловище не входит). Мышечный возраст — тестовая модель
+          0.1-synthetic: коэффициенты и возрастные ориентиры переданы владельцем без описания происхождения и
+          выборки, клиническая проверка не проведена; только мужчины 20–89 лет; показывается только в режиме
+          тестирования. «Возраст по LQ1» — значение из отчёта LQ One, внесённое врачом, без пересчёта. Ни мышечный
+          возраст, ни возраст по LQ1 в LMB BioAge не входят: веса не утверждены. Респираторный профиль — в работе.
         </li>
         <li>Изменение оценки между визитами не означает доказанного лечебного эффекта.</li>
         <li>PhenoAge — самостоятельный показатель (Levine 2018, поправка 2019), в LMB BioAge не входит.</li>
@@ -714,5 +760,29 @@ export function Methodology({ result, catalog, extra, settings }: {
       </dl>
       {extra}
     </div>
+  );
+}
+
+/** Недостающие данные: первые пять видны, остальные свёрнуты. */
+function MissingList({ entries, names, goTo }: { entries: [string, string[]][]; names: Record<string, string>; goTo?: GoTo }) {
+  const [all, setAll] = useState(false);
+  const LIMIT = 5;
+  const shown = all || entries.length <= LIMIT + 1 ? entries : entries.slice(0, LIMIT);
+  return (
+    <>
+      <ul className="gap-list">
+        {shown.map(([f, by]) => (
+          <li key={f}>
+            <FieldLinks codes={[f]} names={names} goTo={goTo} />
+            <span className="muted small"> — нужно для: {[...new Set(by)].join(", ")}</span>
+          </li>
+        ))}
+      </ul>
+      {shown.length < entries.length && (
+        <button type="button" className="more-btn" onClick={() => setAll(true)}>
+          Показать ещё {entries.length - shown.length}
+        </button>
+      )}
+    </>
   );
 }
