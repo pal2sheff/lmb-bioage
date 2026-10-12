@@ -13,21 +13,49 @@ export interface CalcCase {
   birth_date: string;
   encounter_date: string;
   sex: "female" | "male" | "";
-  measurements: Record<string, { value: number; unit: string }>;
+  measurements: Record<string, { value: number; unit: string; qualifier?: "lt" | "gt" }>;
   flags: Record<string, string>;
   frax: { major: number; hip: number; with_bmd: boolean; inputs_bound: boolean } | null;
+}
+
+/** Строка предложения импорта анализов (lmb_engine.labimport.candidates). */
+export interface LabItem {
+  row: number;
+  name: string;
+  comparator: "" | "<" | ">";
+  value: string;
+  unit_raw: string | null;
+  unit: string | null;
+  date: string | null;
+  code: string;
+  field: string;
+  status: "ok" | "check" | "skip";
+  reason: string;
+  selected: boolean;
+  transferable: boolean;
+  alternative: boolean;
+  date_differs: boolean;
+  duplicate?: string;
+}
+export interface LabImport {
+  items: LabItem[];
+  unmatched: string[];
+  doc_date: string | null;
+  lqone_doc: boolean;
+  error?: string;
 }
 
 export interface Engine {
   meta: EngineMeta;
   catalog: Catalog;
   calculate: (c: CalcCase) => EngineResult;
+  labImport: (p: { name?: string; b64?: string; lines?: string[]; encounter_date: string }) => LabImport;
 }
 
 interface PyodideLike {
   FS: { mkdirTree: (p: string) => void; writeFile: (p: string, d: Uint8Array) => void };
   runPython: (code: string) => unknown;
-  globals: { get: (name: string) => { calculate: (s: string) => string } };
+  globals: { get: (name: string) => { calculate: (s: string) => string; lab_import: (s: string) => string } };
 }
 
 const base = import.meta.env.BASE_URL; // «./» — работает по любому адресу публикации
@@ -66,5 +94,6 @@ export async function loadEngine(onStage: (text: string) => void): Promise<Engin
     },
     catalog,
     calculate: (c) => JSON.parse(bridge.calculate(JSON.stringify(c))) as EngineResult,
+    labImport: (p) => JSON.parse(bridge.lab_import(JSON.stringify(p))) as LabImport,
   };
 }

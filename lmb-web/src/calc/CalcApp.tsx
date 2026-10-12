@@ -6,7 +6,8 @@ import { Alert, Button, ageOn, dateRu } from "../components/ui";
 import type { Catalog, Definition, IndexRes, QItem } from "../types";
 import { unitRu } from "../units";
 import { EXAMPLE, EXAMPLE_YOUNGER } from "./example";
-import { loadEngine, type CalcCase, type Engine } from "./engine";
+import { loadEngine, type CalcCase, type Engine, type LabImport, type LabItem } from "./engine";
+import { readLabFile } from "./labfile";
 
 export interface FormState {
   birth_date: string;
@@ -39,11 +40,19 @@ const OPTION_LABEL: Record<string, string> = {
 const FILE_FORMAT = "lmb-bioage-case";
 const DRAFT_KEY = "lmb.calc.draft.v1";
 /** Пункты анкеты, которые показываются не в анкете: источник ACR выбирается рядом с полями ACR. */
-const NOT_IN_QUESTIONNAIRE = new Set(["acr_source", "frax_assumed_no"]);
+const NOT_IN_QUESTIONNAIRE = new Set(["acr_source", "frax_assumed_no", "lqone_device_model", "lqone_software_version",
+  "lqone_measured_on"]);
+/** Сведения об исследовании LQ One — вводятся в разделе «Данные» рядом с показателем. */
+const LQONE_META: [string, string, "text" | "date"][] = [
+  ["lqone_device_model", "Модель аппарата", "text"],
+  ["lqone_software_version", "Версия программы", "text"],
+  ["lqone_measured_on", "Дата измерения", "date"],
+];
 /** Поля, у которых есть собственный элемент в форме (для перехода от сообщения). */
 const FIELD_ID: Record<string, string> = {
   birth_date: "c-birth", sex_at_birth: "c-sex", frax_result: "f-major", frax_major_10y_pct: "f-major",
-  frax_hip_10y_pct: "f-hip", acr_source: "acr-source",
+  frax_hip_10y_pct: "f-hip", acr_source: "acr-source", lqone_device_model: "q-lqone_device_model",
+  lqone_software_version: "q-lqone_software_version", lqone_measured_on: "q-lqone_measured_on",
 };
 
 /** Приведение формы из файла или черновика: берутся только известные поля (устаревшие игнорируются). */
@@ -78,9 +87,12 @@ export function toCase(f: FormState, catalog: Catalog): { kase: CalcCase; proble
   const names = fieldNames(catalog);
   const measurements: CalcCase["measurements"] = {};
   for (const [code, v] of Object.entries(f.values)) {
-    const n = parseNumber(v.text);
+    // «<0,5» и «>300» (результат за пределом определения) передаются со знаком — не как точное число
+    const m = /^\s*([<>≤≥])\s*(.*)$/.exec(v.text);
+    const n = parseNumber(m ? m[2] : v.text);
     if (n === "invalid") problems.push({ code, text: `${names[code] ?? code}: не число — используйте цифры и запятую` });
-    else if (n !== null) measurements[code] = { value: n, unit: v.unit };
+    else if (n !== null)
+      measurements[code] = m ? { value: n, unit: v.unit, qualifier: m[1] === "<" || m[1] === "≤" ? "lt" : "gt" } : { value: n, unit: v.unit };
   }
   const flags: Record<string, string> = {};
   for (const [k, v] of Object.entries(f.flags)) if (v && v !== "unknown") flags[k] = v.trim();
@@ -182,6 +194,8 @@ export function CalcApp() {
   const [report, setReport] = useState(false);
   const [focus, setFocus] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const labRef = useRef<HTMLInputElement>(null);
+  const [imp, setImp] = useState<{ file: string; data: LabImport; sel: Set<number> } | null>(null);
   const first = useRef(true);
 
   useEffect(() => {
@@ -292,6 +306,40 @@ export function CalcApp() {
     }
   }
 
+  async function importLab(file: File) {
+    if (!engine) return;
+    setMsg(`Чтение файла ${file.name}…`);
+    try {
+      const data = await readLabFile(file, engine, form.encounter_date);
+      if (data.error) {
+        setImp(null);
+        setMsg(`${file.name}: ${data.error}`);
+        return;
+      }
+      setImp({ file: file.name, data, sel: new Set(data.items.map((it, i) => (it.selected ? i : -1)).filter((i) => i >= 0)) });
+      setMsg("");
+    } catch (e) {
+      setImp(null);
+      setMsg("Не удалось прочитать файл: " + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
+  function applyImport() {
+    if (!imp) return;
+    const chosen = imp.data.items.filter((_, i) => imp.sel.has(i));
+    setForm((f) => {
+      const values = { ...f.values };
+      const flags = { ...f.flags };
+      for (const it of chosen) {
+        values[it.code] = { text: (it.comparator || "") + it.value, unit: it.unit! };
+        if (it.code.startsWith("lqone_") && it.date) flags.lqone_measured_on = it.date;
+      }
+      return { ...f, values, flags };   // выбор источника ACR и другие ответы не меняются
+    });
+    setMsg(`Перенесено показателей: ${chosen.length} (файл ${imp.file}). Проверьте значения в разделе «Данные».`);
+    setImp(null);
+  }
+
   function loadExample(f: FormState, name: string) {
     setForm(f);
     setReport(false);
@@ -389,9 +437,16 @@ export function CalcApp() {
               </p>
               <div className="row">
                 <Button onClick={clearAll}>Очистить</Button>
-                <Button onClick={() => fileRef.current?.click()}>Открыть файл</Button>
+                <Button onClick={() => fileRef.current?.click()}>Открыть случай</Button>
+                <Button onClick={() => labRef.current?.click()}>Импорт анализов</Button>
                 <Button kind="primary" onClick={save}>Сохранить в файл</Button>
               </div>
+              <input ref={labRef} type="file" accept=".pdf,.xlsx,.csv,.txt,.xls,.png,.jpg,.jpeg" hidden aria-label="Файл анализов"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void importLab(f);
+                  e.target.value = "";
+                }} />
               <input ref={fileRef} type="file" accept=".json,application/json" hidden
                 onChange={(e) => {
                   const f = e.target.files?.[0];
@@ -399,6 +454,21 @@ export function CalcApp() {
                   e.target.value = "";
                 }} />
             </div>
+            {imp && (
+              <ImportReview imp={imp} form={form} encounterDate={form.encounter_date}
+                toggle={(i) => setImp((x) => {
+                  if (!x) return x;
+                  const sel = new Set(x.sel);
+                  if (sel.has(i)) sel.delete(i);
+                  else {
+                    // одно значение на поле: выбор строки снимает другие строки того же поля
+                    x.data.items.forEach((it, j) => it.code === x.data.items[i].code && sel.delete(j));
+                    sel.add(i);
+                  }
+                  return { ...x, sel };
+                })}
+                apply={applyImport} cancel={() => setImp(null)} />
+            )}
             <DataInputs catalog={engine.catalog} form={form} setForm={setForm} setValue={setValue} setFlag={setFlag}
               errors={errors} result={result} />
             <div className="next-row">
@@ -576,6 +646,27 @@ function DataInputs(props: {
               </div>
             );
           })}
+          {g.items.some((d) => d.code === "visbody_asm") && (
+            <p className="muted small group-note">
+              Масса мышц конечностей (ASM) — значение из отчёта аппарата. SMM и сумма сегментов Visbody не подставляются:
+              соответствие не подтверждено спецификацией аппарата.
+            </p>
+          )}
+          {g.items.some((d) => d.code === "lqone_bioage_years") && (
+            <>
+              {LQONE_META.map(([code, label, kind]) => (
+                <div key={code} className="calc-row" id={`q-${code}`}>
+                  <label htmlFor={`lq-${code}`}>{label}</label>
+                  <input id={`lq-${code}`} type={kind} maxLength={50} value={form.flags[code] ?? ""}
+                    onChange={(e) => setFlag(code, e.target.value)} />
+                </div>
+              ))}
+              <p className="muted small group-note">
+                Значение переносится из заключения LQ One как есть и в LMB BioAge не входит. Отчёт LQ One с текстовым
+                слоем можно загрузить через «Импорт анализов».
+              </p>
+            </>
+          )}
           {g.items.some((d) => d.code === "acr_lab") && bothAcr && (
             <div className={acr?.status === "awaiting_review" ? "calc-row q has-error" : "calc-row q"} id="acr-source">
               <span>Источник ACR для расчёта</span>
@@ -644,6 +735,97 @@ function DataInputs(props: {
         </div>
       </section>
     </div>
+  );
+}
+
+const dateRuIso = (d: string | null) => (d ? d.split("-").reverse().join(".") : "—");
+
+/** Окно проверки импорта: показатель, значение, единица, дата, поле приложения; перенос подтверждает врач. */
+function ImportReview(props: {
+  imp: { file: string; data: LabImport; sel: Set<number> };
+  form: FormState;
+  encounterDate: string;
+  toggle: (i: number) => void;
+  apply: () => void;
+  cancel: () => void;
+}) {
+  const { imp, form, toggle, apply, cancel } = props;
+  const rows = imp.data.items.map((it, i) => ({ it, i })).filter(({ it }) => it.status !== "skip");
+  const skipped = imp.data.items.filter((it) => it.status === "skip");
+  const note = (it: LabItem) => {
+    const out: string[] = [];
+    if (it.reason) out.push(it.reason);
+    if (it.duplicate) out.push(it.duplicate);
+    if (it.date_differs) out.push("дата отличается от даты обследования");
+    const cur = form.values[it.code]?.text?.trim();
+    if (cur && cur !== (it.comparator || "") + it.value) out.push(`в форме сейчас ${cur} — будет заменено`);
+    return out.join("; ");
+  };
+  return (
+    <section className="card import-review" aria-label="Проверка импорта анализов">
+      <header className="import-head">
+        <h3>Импорт анализов: {imp.file}</h3>
+        <span className="muted small">
+          {imp.data.doc_date ? `дата в документе ${dateRuIso(imp.data.doc_date)} · ` : ""}отметьте показатели для переноса
+        </span>
+      </header>
+      {rows.length === 0 ? (
+        <p className="muted">Подходящих показателей не найдено — перенесите значения вручную.</p>
+      ) : (
+        <div className="table-wrap">
+          <table className="import-table">
+            <thead>
+              <tr>
+                <th aria-label="Перенести" />
+                <th>Показатель в файле</th>
+                <th className="r">Значение</th>
+                <th>Ед.</th>
+                <th>Дата</th>
+                <th>Поле приложения</th>
+                <th>Примечание</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(({ it, i }) => (
+                <tr key={i} className={it.alternative ? "alt" : it.status === "check" ? "check" : ""}>
+                  <td>
+                    <input type="checkbox" checked={imp.sel.has(i)} disabled={!it.transferable}
+                      aria-label={`Перенести: ${it.name} → ${it.field}`} onChange={() => toggle(i)} />
+                  </td>
+                  <td>{it.name}</td>
+                  <td className="r num">{(it.comparator || "") + it.value}</td>
+                  <td>{it.unit ? unitRu(it.unit) : it.unit_raw ?? "—"}</td>
+                  <td className="num">{dateRuIso(it.date)}</td>
+                  <td>{it.field}</td>
+                  <td className="small">{note(it)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {(skipped.length > 0 || imp.data.unmatched.length > 0) && (
+        <details className="more">
+          <summary>Не переносится: {skipped.length + imp.data.unmatched.length}</summary>
+          <ul className="small muted import-skipped">
+            {skipped.map((it, k) => (
+              <li key={`s${k}`}>
+                {it.name} {(it.comparator || "") + it.value} {it.unit_raw ?? ""} — {it.reason}
+              </li>
+            ))}
+            {imp.data.unmatched.map((n) => (
+              <li key={`u${n}`}>{n} — не используется в расчётах приложения</li>
+            ))}
+          </ul>
+        </details>
+      )}
+      <div className="row import-actions">
+        <Button onClick={cancel}>Отмена</Button>
+        <Button kind="primary" onClick={apply} disabled={imp.sel.size === 0}>
+          Перенести выбранное ({imp.sel.size})
+        </Button>
+      </div>
+    </section>
   );
 }
 

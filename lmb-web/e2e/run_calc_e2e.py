@@ -7,6 +7,10 @@ from __future__ import annotations
 
 import functools
 import http.server
+import io
+import re
+import tempfile
+import zipfile
 import threading
 from pathlib import Path
 
@@ -28,6 +32,66 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def log_message(self, *a):
         pass
+
+
+CSV_ROWS = [
+    ["Показатель", "Результат", "Ед. изм.", "Референс"],
+    ["Глюкоза", "5,2", "ммоль/л", "3,9-5,5"],
+    ["Креатинин", "70", "мкмоль/л", "44-80"],
+    ["Креатинин в разовой порции мочи", "10", "ммоль/л", ""],
+    ["Альбумин", "44", "г/л", "35-52"],
+    ["Микроальбумин (моча)", "20", "мг/л", "<30"],
+    ["Нейтрофилы, абс.", "3,5", "10*9/л", ""],
+    ["Нейтрофилы, %", "55,6", "%", ""],
+    ["RDW-CV", "13,4", "%", ""],
+    ["RDW-SD", "42,1", "фл", ""],
+    ["С-реактивный белок (высокочувствительный)", "<0,5", "мг/л", ""],
+    ["Ферритин", "80", "нг/мл", ""],
+]
+
+
+def _xlsx(rows) -> bytes:
+    def cell(r, c, v):
+        ref = f"{chr(65 + c)}{r + 1}"
+        if isinstance(v, str):
+            return f'<c r="{ref}" t="inlineStr"><is><t>{v}</t></is></c>'
+        return f'<c r="{ref}"><v>{v}</v></c>'
+    sheet = "".join(f'<row r="{r + 1}">' + "".join(cell(r, c, v) for c, v in enumerate(row)) + "</row>"
+                    for r, row in enumerate(rows))
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("xl/workbook.xml", '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+                   'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'
+                   '<sheet name="Анализы" sheetId="1" r:id="rId1"/></sheets></workbook>')
+        z.writestr("xl/_rels/workbook.xml.rels", '<Relationships xmlns="http://schemas.openxmlformats.org/package/'
+                   '2006/relationships"><Relationship Id="rId1" Type="worksheet" Target="worksheets/sheet1.xml"/>'
+                   '</Relationships>')
+        z.writestr("xl/worksheets/sheet1.xml", '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/'
+                   f'2006/main"><sheetData>{sheet}</sheetData></worksheet>')
+    return buf.getvalue()
+
+
+def lab_fixtures(browser) -> dict:
+    """Синтетические лабораторные файлы (данные выдуманы): CSV в Windows-1251, XLSX, PDF с текстовым слоем, «скан»."""
+    d = Path(tempfile.mkdtemp())
+    out = {"csv": d / "lab_synthetic.csv", "xlsx": d / "lab_synthetic.xlsx", "pdf": d / "lab_synthetic.pdf",
+           "png": d / "lab_scan.png"}
+    out["csv"].write_bytes("\n".join(";".join(r) for r in CSV_ROWS).encode("cp1251"))
+    out["xlsx"].write_bytes(_xlsx([["Показатель", "Результат", "Ед. изм.", "Дата"],
+                                   ["Глюкоза", 5.9, "ммоль/л", "01.09.2026"],
+                                   ["Глюкоза", 5.2, "ммоль/л", "10.10.2026"],
+                                   ["Тромбоциты", 240, "10^9/л", "10.10.2026"]]))
+    p = browser.new_page()
+    rows = [("АЛТ", "20", "Ед/л"), ("АСТ", "22", "Ед/л"), ("Щелочная фосфатаза", "78", "Ед/л"), ("MCV", "91", "фл")]
+    p.set_content("<html><body style='font-family:Arial'><h3>Синтетическая лаборатория</h3>"
+                  "<p>Дата взятия: 10.10.2026</p><table cellpadding='6'><tr><th>Исследование</th><th>Результат</th>"
+                  "<th>Ед. изм.</th></tr>" + "".join(f"<tr><td>{a}</td><td>{v}</td><td>{u}</td></tr>" for a, v, u in rows)
+                  + "</table></body></html>")
+    p.pdf(path=str(out["pdf"]), format="A4")
+    p.set_content("<div style='width:200px;height:80px;background:#ddd'></div>")
+    out["png"].write_bytes(p.screenshot())
+    p.close()
+    return out
 
 
 def main() -> int:
@@ -89,7 +153,7 @@ def run(base: str) -> None:
         deviation = page.locator("section[aria-labelledby=dv-dev]")
         expect(branches.locator(".dv-row")).to_have_count(7)               # графики видны сразу, без раскрытия
         expect(deviation.locator(".dev-grid .dev-row")).to_have_count(12)
-        expect(page.locator(".branch")).to_have_count(9)
+        expect(page.locator(".branch:not(.future)")).to_have_count(9)
         body = page.locator("main").inner_text()
         for banned in ("LMB − PhenoAge", "Контроль", "Рассчитано", "v0.3", "sha256", "Исследовательский статус",
                        "не валидирован", "Исследовательская модель", "Клинический итог не рассчитан",
@@ -141,8 +205,23 @@ def run(base: str) -> None:
         step("«О методике»: статус, валидация, область, настройки режима и проверочный расчёт Cardio (+0,319; 57,19); PhenoAge виден всегда")
 
         tab("Данные")
-        page.get_by_label("Лимфоциты абс.", exact=True).fill("8")
+        page.get_by_label("Альбумин сыворотки", exact=True).fill("1000")
         row = lambda label: page.locator(".calc-row", has=page.get_by_label(label, exact=True))  # noqa: E731
+        expect(row("Альбумин сыворотки").locator(".field-error")).to_contain_text("вне допустимого диапазона")
+        tab("Результаты")
+        expect(pheno).to_contain_text("не рассчитан")
+        expect(pheno.locator(".sn-error")).to_have_text("Проверьте альбумин сыворотки")
+        expect(lmb.locator(".bio-value")).to_contain_text("58,6")                 # LMB от альбумина не зависит
+        page.screenshot(path=SHOTS / "calc_10_albumin.png", full_page=False)
+        pheno.get_by_role("button", name="Проверьте альбумин сыворотки").click()
+        expect(page.get_by_label("Альбумин сыворотки", exact=True)).to_be_focused()
+        page.get_by_label("Альбумин сыворотки", exact=True).fill("44")
+        tab("Результаты")
+        expect(pheno.locator(".figure-value")).to_contain_text("50,1")
+        step("альбумин 1000: в карточке PhenoAge «Проверьте альбумин сыворотки» с переходом к полю, подробности у поля; LMB не затронут")
+
+        tab("Данные")
+        page.get_by_label("Лимфоциты абс.", exact=True).fill("8")
         expect(row("Лимфоциты абс.")).to_have_class("calc-row has-error")
         expect(row("Лимфоциты абс.").locator(".field-error")).to_contain_text("противоречив")
         expect(row("Лейкоциты")).to_have_class("calc-row has-error")
@@ -159,8 +238,8 @@ def run(base: str) -> None:
 
         page.get_by_label("Лимфоциты абс.", exact=True).fill("")
         tab("Результаты")
-        expect(pheno.locator(".notes")).to_contain_text("не хватает: Лимфоциты абс.")
-        assert "Альбумин" not in pheno.locator(".notes").inner_text()
+        expect(pheno.locator(".short-notes")).to_contain_text("не хватает: Лимфоциты абс.")
+        assert "Альбумин" not in pheno.locator(".short-notes").inner_text()
         tab("Данные")
         page.get_by_label("Лимфоциты абс.", exact=True).fill("2,0")
         step("сообщения перечисляют только фактически отсутствующие показатели")
@@ -199,6 +278,78 @@ def run(base: str) -> None:
         expect(page.get_by_label("Креатинин сыворотки", exact=True)).to_have_value("70")
         step("единицы без дублей; смена единицы — явный выбор «пересчитать» или «без пересчёта»")
 
+        files = lab_fixtures(b)
+        lab = page.get_by_label("Файл анализов")
+        lab.set_input_files(str(files["csv"]))
+        review = page.locator(".import-review")
+        expect(review).to_contain_text("Импорт анализов: lab_synthetic.csv")
+        rrow = lambda name: review.locator("tbody tr").filter(has=page.get_by_text(name, exact=True))  # noqa: E731
+        expect(rrow("Креатинин").locator("td").nth(5)).to_have_text("Креатинин сыворотки")
+        expect(rrow("Креатинин в разовой порции мочи").locator("td").nth(5)).to_have_text("Креатинин мочи")
+        expect(rrow("Альбумин").locator("td").nth(5)).to_have_text("Альбумин сыворотки")
+        expect(rrow("Микроальбумин (моча)").locator("td").nth(5)).to_have_text("Альбумин мочи")
+        expect(rrow("Нейтрофилы, абс.").locator("input")).to_be_checked()
+        expect(rrow("С-реактивный белок (высокочувствительный)").locator("td").nth(2)).to_have_text("<0,5")
+        review.locator("summary").click()
+        skipped = review.locator(".import-skipped")
+        expect(skipped).to_contain_text("Нейтрофилы, % 55,6 % — процент лейкоформулы")
+        expect(skipped).to_contain_text("RDW-SD 42,1 фл — RDW-SD (фл) не подставляется")
+        expect(skipped).to_contain_text("Ферритин — не используется")
+        page.screenshot(path=SHOTS / "calc_11_import_review.png", full_page=False)
+        review.get_by_role("button", name="Перенести выбранное").click()
+        expect(page.get_by_label("С-реактивный белок (высокочувствительный)", exact=True)).to_have_value("<0,5")
+        expect(row("С-реактивный белок (высокочувствительный)").locator(".field-error")).to_contain_text("предела определения")
+        expect(page.get_by_role("radio", name="Расчёт по альбумину и креатинину")).to_have_attribute("aria-checked", "true")
+        tab("Результаты")
+        expect(pheno.locator(".sn-error")).to_contain_text("Проверьте С-реактивный белок")
+        tab("Данные")
+        page.get_by_label("С-реактивный белок (высокочувствительный)", exact=True).fill("1,8")
+        step("импорт CSV: кровь и моча различаются, проценты лейкоформулы и RDW-SD не переносятся, «<0,5» сохранён со знаком; выбор источника ACR не изменился")
+
+        lab.set_input_files(str(files["xlsx"]))
+        expect(review).to_contain_text("lab_synthetic.xlsx")
+        glu = review.locator("tbody tr").filter(has_text="Глюкоза")
+        expect(glu).to_have_count(2)
+        expect(glu.filter(has_text="10.10.2026").locator("input")).to_be_checked()
+        expect(glu.filter(has_text="01.09.2026").locator("input")).not_to_be_checked()
+        expect(glu.first).to_contain_text("несколько дат")
+        review.get_by_role("button", name="Отмена").click()
+        lab.set_input_files(str(files["pdf"]))
+        expect(review).to_contain_text("lab_synthetic.pdf")
+        expect(review.locator("tbody tr").filter(has_text="Щелочная фосфатаза")).to_contain_text("78")
+        expect(review.locator("tbody tr").filter(has_text="АЛТ")).to_contain_text("Ед/л")
+        review.get_by_role("button", name="Перенести выбранное").click()
+        expect(page.get_by_label("Щелочная фосфатаза", exact=True)).to_have_value("78")
+        lab.set_input_files(str(files["png"]))
+        expect(page.locator(".alert")).to_contain_text("нет текстового слоя")
+        expect(review).to_have_count(0)
+        step("импорт XLSX (повтор с разными датами — выбрана дата обследования), текстового PDF; скан — сообщение о ручном переносе")
+
+        page.get_by_label("Биологический возраст (LQ One)", exact=True).fill("52")
+        page.get_by_label("Достоверность измерения (LQ One)", exact=True).fill("140")
+        expect(row("Достоверность измерения (LQ One)").locator(".field-error")).to_contain_text("вне допустимого диапазона")
+        page.get_by_label("Достоверность измерения (LQ One)", exact=True).fill("87")
+        page.get_by_label("Модель аппарата", exact=True).fill("LQ One (синтетика)")
+        page.get_by_label("Версия программы", exact=True).fill("1.0")
+        page.get_by_label("Дата измерения", exact=True).fill("2026-10-10")
+        tab("Результаты")
+        adaptive = page.locator(".branch").filter(has_text="Адаптационный и вегетативный профиль")
+        expect(adaptive.locator(".index-val")).to_contain_text("52")
+        expect(adaptive).to_contain_text("по заключению LQ One · аппарат LQ One (синтетика) · версия 1.0 · достоверность 87 %")
+        expect(lmb.locator(".bio-value")).to_contain_text("58,6")                 # в LMB не входит
+        future = page.locator(".branch.future")
+        expect(future).to_contain_text("Респираторный профиль")
+        expect(future).to_contain_text("в работе")
+        expect(page.locator(".branch:not(.future)")).to_have_count(9)
+        step("LQ One: ручной ввод биологического возраста, модели, версии, достоверности и даты — показан в адаптационном профиле, в LMB не входит; респираторный профиль — «в работе»")
+
+        page.locator("section[aria-labelledby=dv-dev]").get_by_role("button", name=re.compile("^SCORE2: Z")).click()
+        ticks = [t.replace(",", ".").replace("−", "-") for t in page.locator(".dev-detail .traj-tick").all_text_contents()]
+        values = [float(t) for t in ticks if re.fullmatch(r"-?\d+(\.\d+)?", t)]
+        assert values and min(values) >= 0, f"отрицательная отметка шкалы риска: {ticks}"
+        page.screenshot(path=SHOTS / "calc_12_score2_scale.png", full_page=False)
+        step(f"шкала риска SCORE2 без отрицательных отметок: {', '.join(ticks)}")
+
         tab("Анкета")
         counter = page.get_by_role("tab", name="Анкета").locator(".num").inner_text()
         done, total = (int(x) for x in counter.split("/"))
@@ -220,7 +371,7 @@ def run(base: str) -> None:
         saved = dl.value.path()
         page.get_by_role("button", name="Очистить").click()
         expect(page.locator(".topbar")).to_contain_text("Возраст —")
-        page.locator("input[type=file]").set_input_files(saved)
+        page.locator("input[type=file][accept^='.json']").set_input_files(saved)
         expect(page.get_by_label("ACR лаборатории", exact=True)).to_have_value("2,5")
         import json, tempfile
         legacy = json.loads(open(saved, encoding="utf-8").read())
@@ -229,7 +380,7 @@ def run(base: str) -> None:
         tmp = Path(tempfile.mkdtemp()) / "old-case.json"
         tmp.write_text(json.dumps(legacy, ensure_ascii=False), encoding="utf-8")
         page.get_by_role("button", name="Очистить").click()
-        page.locator("input[type=file]").set_input_files(str(tmp))
+        page.locator("input[type=file][accept^='.json']").set_input_files(str(tmp))
         expect(page.locator(".alert")).to_contain_text("Открыт файл old-case.json")
         tab("Результаты")
         expect(lmb.locator(".bio-value")).to_contain_text("58,6")
@@ -244,9 +395,15 @@ def run(base: str) -> None:
         expect(report).not_to_contain_text("LMB − PhenoAge")
         expect(report.locator(".cardio-check")).to_have_count(0)
         expect(report.locator(".report-method")).to_contain_text("О методике")
+        expect(report.locator(".report-model .dv-row")).to_have_count(7)                 # диаграмма вкладов
+        expect(report.locator(".report-model .model-table")).to_contain_text("Оценка системы")
+        main_table = report.locator(".report-table:not(.compact)")
+        expect(main_table.locator("thead")).not_to_contain_text("Оценка системы")
+        expect(report).to_contain_text("Биологический возраст LQ One")
+        expect(report).to_contain_text("Респираторный профиль")
         rtext = report.inner_text()
         assert rtext.count("Клиническая валидация не проведена") == 1, "методика в отчёте повторяется"
-        assert rtext.index("О методике") > rtext.index("Показатели по системам"), "методика — в конце отчёта"
+        assert rtext.index("О методике") > rtext.index("Клинические индексы и показатели"), "методика — в конце отчёта"
         page.screenshot(path=SHOTS / "calc_07_report.png", full_page=True)
         page.emulate_media(media="print")
         expect(page.locator(".tabs")).to_be_hidden()

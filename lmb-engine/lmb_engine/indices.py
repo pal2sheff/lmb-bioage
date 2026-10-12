@@ -49,7 +49,37 @@ def asmi(enc: Encounter) -> IndexResult:
     h = g.value("height_cm")
     if g.blocked():
         return g.result()
-    return g.result(asm / (h / 100) ** 2, "kg/m2")
+    # сумма сегментов Visbody как ASM не подставляется: соответствие не подтверждено спецификацией аппарата
+    g.warnings.append("Масса мышц конечностей введена вручную; соответствие показателя Visbody массе мышц "
+                      "конечностей спецификацией аппарата не подтверждено")
+    return g.result(asm / (h / 100) ** 2, "kg/m2", {"asm_source": "manual"})
+
+
+# ---------------------------------------------------------------- Adaptive (LQ One)
+def lqone_bioage(enc: Encounter) -> IndexResult:
+    """Итоговый показатель заключения LQ One «Биологический возраст», годы — как в отчёте аппарата.
+
+    Только отображение: внутренний алгоритм LQ One не воспроизводится, в LMB v0.3 не входит,
+    правила расчёта адаптационного профиля не утверждены.
+    """
+    g = Gate(enc, "lqone_bioage", 1)
+    v = g.value("lqone_bioage_years")
+    rel = g.optional("lqone_reliability_pct")
+    if g.blocked():
+        return g.result()
+    model = (enc.flags.get("lqone_device_model") or "").strip() or None
+    version = (enc.flags.get("lqone_software_version") or "").strip() or None
+    measured = (enc.flags.get("lqone_measured_on") or "").strip() or None
+    if not model or not version:
+        g.warnings.append("Не указаны модель аппарата и версия программы LQ One")
+    if rel is None:
+        g.warnings.append("Не указана достоверность измерения LQ One")
+    if measured and measured != enc.encounter_date.isoformat():
+        g.warnings.append(f"Измерение LQ One от {'.'.join(reversed(measured.split('-')))} — не в дату обследования")
+    return g.result(v, "years", {
+        "source": "LQ One, ручной ввод из заключения", "original_name": "Биологический возраст",
+        "device_model": model, "software_version": version, "measured_on": measured, "reliability_pct": rel,
+        "reliability_threshold": None, "in_model": False})
 
 
 # ---------------------------------------------------------------- Metabolic
@@ -448,7 +478,7 @@ def phenoage(enc: Encounter, params: dict = None) -> IndexResult:
 
 
 REGISTRY = {
-    "bmi": bmi, "whtr": whtr, "asmi": asmi,
+    "bmi": bmi, "whtr": whtr, "asmi": asmi, "lqone_bioage": lqone_bioage,
     "homa_ir": homa_ir, "tyg": tyg, "aip": aip, "non_hdl": non_hdl,
     "egfr_ckdepi_cr_2021": egfr_ckdepi_cr_2021, "acr": acr,
     "fib4": fib4, "nlr": nlr, "sii": sii,

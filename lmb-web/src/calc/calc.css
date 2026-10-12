@@ -64,11 +64,10 @@ input.is-bad { border-color: var(--error); background: var(--burgundy-soft); }
   .input-grid, .calc-toolbar, .next-row { display: none !important; }
   .report-table { font-size: 10pt; table-layout: fixed; }
   .report-table th, .report-table td { padding: 6px 6px; overflow-wrap: anywhere; }
-  .report-table:not(.compact) th:nth-child(1) { width: 20%; }
-  .report-table:not(.compact) th:nth-child(2) { width: 32%; }
-  .report-table:not(.compact) th:nth-child(3) { width: 16%; }
+  .report-table:not(.compact) th:nth-child(1) { width: 22%; }
+  .report-table:not(.compact) th:nth-child(2) { width: 38%; }
+  .report-table:not(.compact) th:nth-child(3) { width: 22%; }
   .report-table:not(.compact) th:nth-child(4) { width: 18%; }
-  .report-table:not(.compact) th:nth-child(5) { width: 14%; }
   .report-table th { white-space: normal; }
   .report-table .r { white-space: normal; }
   .report-table .badge { font-size: 7.5pt; padding: 1px 5px; white-space: nowrap; gap: 3px; }
@@ -103,3 +102,30 @@ input.is-bad { border-color: var(--error); background: var(--burgundy-soft); }
   background: var(--accent-soft); border-radius: 8px; font-size: 14px; }
 .unit-confirm > span { flex-basis: 100%; }
 @media (max-width: 760px) { .draft-status { display: none; } }
+/* импорт анализов: окно проверки */
+.group-note { margin: 8px 0 0; }
+.import-review { margin: 16px 0 4px; padding: 18px 22px; border-top: 3px solid var(--accent); }
+.import-head { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; margin-bottom: 10px; }
+.import-head h3 { font-size: 17px; }
+.import-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.import-table th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 6px 8px;
+  border-bottom: 1px solid var(--rule-strong); }
+.import-table td { padding: 6px 8px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.import-table .r { text-align: right; white-space: nowrap; }
+.import-table tr.alt td { color: var(--ink-2); }
+.import-table tr.check td:last-child { color: var(--review); }
+.import-table input[type="checkbox"] { width: 18px; height: 18px; }
+.import-skipped { margin: 6px 0 0; padding-left: 18px; }
+.import-actions { justify-content: flex-end; margin-top: 12px; }
+/* отчёт: модельная часть и печать */
+.report-chart { margin-bottom: 12px; }
+.report-chart .dv-card { box-shadow: none; border-color: var(--rule); }
+.model-table { margin-top: 4px; }
+@media print {
+  .report h1, .report h2, .report h3 { break-after: avoid; page-break-after: avoid; }
+  .report-table thead { display: table-header-group; }
+  .report-chart, .report-model .model-table, .report-method { break-inside: avoid; page-break-inside: avoid; }
+  .report-chart .dv-row { min-height: 22px; }
+  .report-chart .dv-label { font-size: 10pt; }
+  .report .short-notes, .report .notes { font-size: 9pt; }
+}

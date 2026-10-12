@@ -121,3 +121,25 @@ def test_control_function_uses_score2_formula():
     p = cardio.load_params("score2")
     assert control_score2_pct(Sex.FEMALE, 55.610959, load_experiment()["control_profile"]) == pytest.approx(
         cardio.compute(p, 55.610959, Sex.FEMALE, False, 120, 4.5, 1.5)["risk"] * 100)
+
+
+def test_v03_expected_below_optimal_profile_review():
+    """docs/cardio_normalization_review.md, таблица 2: ожидание v0.3 ниже SCORE2 High оптимального профиля,
+    смещение Z растёт с возрастом (фиксация находки; конфигурация v0.3 не меняется)."""
+    import math
+    from lmb_engine.cardio import compute, load_params
+    from lmb_engine.core import Sex
+    from lmb_engine.model import config_path, load_config
+    p = load_params("score2")
+    n = load_config(config_path("model_v0.3.json"))["normalization"]["score2"]
+    for sex, s in ((Sex.FEMALE, 0), (Sex.MALE, 1)):
+        zs = []
+        for age in (40, 45, 50, 55, 60, 65, 69):
+            e = n["intercept"] + n["age_coef"] * age + n["sex_coef"] * s + n["age_sex_coef"] * age * s
+            r = compute(p, age, sex, False, 120, 4.5, 1.5)["risk"] * 100
+            assert r / math.expm1(e) > 2.8
+            zs.append((math.log1p(r) - e) / n["residual_sd"])
+        assert zs == sorted(zs) and zs[0] > 0.8 and zs[-1] > 3.4
+    e55 = n["intercept"] + n["age_coef"] * 55
+    assert abs((math.log1p(compute(p, 55, Sex.FEMALE, False, 120, 4.5, 1.5)["risk"] * 100) - e55) / n["residual_sd"]
+               - 1.91) < 0.01

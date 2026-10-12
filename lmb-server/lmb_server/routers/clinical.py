@@ -255,7 +255,7 @@ def get_questionnaire(encounter_id: uuid.UUID, p: Principal = Depends(DOCTOR), d
         QuestionnaireAnswer.encounter_id == e.id, QuestionnaireAnswer.is_current.is_(True)))}
     # отсутствующий ответ показывается как «неизвестно», а не «нет»
     return {code: {"name": name,
-                   "answer": cur[code].answer if code in cur else ("unknown" if allowed not in (None, "frax_list") else None),
+                   "answer": cur[code].answer if code in cur else ("unknown" if allowed not in (None, "frax_list", "date") else None),
                    "answered": code in cur, "doctor_only": code in DOCTOR_ONLY_ITEMS}
             for code, (name, allowed) in QUESTIONNAIRE_ITEMS.items()}
 

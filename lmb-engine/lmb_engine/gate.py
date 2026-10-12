@@ -64,6 +64,13 @@ class Gate:
             self.review.append(f"{d.name_ru}: значение не подтверждено врачом")
         return v
 
+    def optional(self, key: str) -> Optional[float]:
+        """Необязательный вход: отсутствие не делает индекс неполным, ошибочное значение — делает."""
+        m = self.enc.measurements.get(key)
+        if m is None or m.value is None:
+            return None
+        return self.value(key)
+
     def age(self) -> Optional[int]:
         if self.enc.birth_date is None:
             self.missing.append("birth_date")

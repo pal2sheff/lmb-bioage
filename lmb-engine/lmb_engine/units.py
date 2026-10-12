@@ -72,7 +72,11 @@ INPUTS = {d.code: d for d in [
     InputDef("crp", "С-реактивный белок (высокочувствительный)", "mg/L",
              {"mg/L": _identity, "mg/dL": lambda x: x * 10}, (0.01, 500), {}),
     InputDef("alp", "Щелочная фосфатаза", "U/L", {"U/L": _identity, "IU/L": _identity}, (5, 3000), {}),
-    InputDef("visbody_asm", "Масса мышц конечностей", "kg", {"kg": _identity}, (5, 60), {}),
+    InputDef("visbody_asm", "Масса мышц конечностей (ASM)", "kg", {"kg": _identity}, (5, 60), {}),
+    # LQ One — ручной ввод итогового показателя из заключения аппарата (ветка Adaptive, в v0.3 не входит).
+    # Диапазоны технические; порог достоверности не утверждён (docs/device_mapping.md).
+    InputDef("lqone_bioage_years", "Биологический возраст (LQ One)", "years", {"years": _identity}, (1, 120), {}),
+    InputDef("lqone_reliability_pct", "Достоверность измерения (LQ One)", "%", {"%": _identity}, (0, 100), {}),
     # МПК только шейки бедра (позвоночник и общий проксимальный отдел не подставляются)
     InputDef("fn_tscore", "T-показатель шейки бедра (референс NHANES III)", "SD", {"SD": _identity}, (-6, 6), {}),
     InputDef("fn_bmd", "МПК шейки бедра", "g/cm2", {"g/cm2": _identity}, (0.2, 2.0), {}),
