@@ -130,3 +130,29 @@ def test_phenoage_via_server(world):
     from lmb_server.catalog import observation_definitions
     defs = {o["code"]: o for o in observation_definitions()}
     assert defs["crp"]["in_model_inputs"] is False and defs["glucose_fasting"]["in_model_inputs"] is True
+
+
+def test_lqone_via_server(world):
+    """LQ One (миграция 0009): ручной ввод итогового показателя заключения, модель/версия/дата — в анкете;
+    показатель отображается в Adaptive и в LMB не входит."""
+    d = world["doctor_a"]
+    eid = visit(d)
+    answers = {**ANSWERS, "lqone_device_model": "LQ One", "lqone_software_version": "1.0",
+               "lqone_measured_on": "2026-10-10"}
+    assert d.put(f"/encounters/{eid}/questionnaire", json={"answers": answers}).status_code == 200
+    bad = d.put(f"/encounters/{eid}/questionnaire", json={"answers": {"lqone_measured_on": "10.10.2026"}})
+    assert bad.status_code == 422
+    before = d.post(f"/encounters/{eid}/calculations", json={}).json()["result"]
+    for code, v, u in [("lqone_bioage_years", 52, "years"), ("lqone_reliability_pct", 87, "%")]:
+        r = d.post(f"/encounters/{eid}/observations", json={"code": code, "value": v, "unit": u})
+        assert r.status_code == 201, r.text
+    res = d.post(f"/encounters/{eid}/calculations", json={}).json()["result"]
+    lq = next(i for i in res["indices"] if i["code"] == "lqone_bioage")
+    assert lq["status"] == "calculated" and lq["value"] == 52 and lq["extra"]["device_model"] == "LQ One"
+    assert lq["extra"]["in_model"] is False
+    assert res["research"]["bioage_years"] == before["research"]["bioage_years"]
+    from lmb_server.catalog import observation_definitions, ui_catalog
+    defs = {o["code"]: o for o in observation_definitions()}
+    assert defs["lqone_bioage_years"]["in_model_inputs"] is False
+    cat = ui_catalog(observation_definitions())
+    assert [b["code"] for b in cat["future_branches"]] == ["respiratory"] and len(cat["branches"]) == 9

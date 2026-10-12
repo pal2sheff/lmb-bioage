@@ -47,6 +47,7 @@ const FORMULA: Record<string, string> = {
   frax_kz: "Результат официального калькулятора FRAX, модель Казахстана; приложение FRAX не рассчитывает",
   asmi: "ASMI = масса мышц конечностей / рост²",
   phenoage: "Levine 2018 (поправка PLoS Med 2019): альбумин, креатинин, глюкоза, вч-СРБ, лимфоциты %, MCV, RDW, ЩФ, лейкоциты, возраст",
+  lqone_bioage: "Показатель из заключения аппарата LQ One («Биологический возраст», годы) — ручной ввод; алгоритм аппарата не воспроизводится, в LMB BioAge не входит. Порог достоверности и правила адаптационного профиля не утверждены",
 };
 /** SCORE2 и SCORE2-OP взаимоисключающие по возрасту: неприменимость второго при рассчитанном первом — не ограничение. */
 const PARTNER: Record<string, string> = { score2: "score2_op", score2_op: "score2" };
@@ -129,6 +130,14 @@ export function ProfileView({ result, catalog, meta, goTo }: { result: EngineRes
       <div className="branch-grid">
         {catalog.branches.map((b) => (
           <SystemCard key={b.code} name={b.name} indices={b.indices} idx={idx} catalog={catalog} names={names} goTo={goTo} />
+        ))}
+        {(catalog.future_branches ?? []).map((b) => (
+          <article key={b.code} className="branch future" aria-label={b.name}>
+            <h3>
+              {b.name} <span className="badge-dev">в работе</span>
+            </h3>
+            <p className="index-expl">{b.note}</p>
+          </article>
         ))}
       </div>
 
@@ -231,8 +240,6 @@ export function PhenoAgeCard({ res, names, goTo }: { res?: IndexRes; names: Reco
   if (!res) return null;
   const ok = res.status === "calculated" && res.value !== null;
   // методические оговорки (сверка с внешним калькулятором) — в справке, а не на основном экране
-  // ошибка ввода — коротко, ссылками на поля; полный текст — в «Ограничениях и недостающих данных»
-  const notes = { ...res, warnings: [], reasons: res.status === "invalid_input" ? [] : res.reasons };
   return (
     <section className="pheno-card" aria-labelledby="pheno-title">
       <span className="eyebrow">
@@ -252,7 +259,7 @@ export function PhenoAgeCard({ res, names, goTo }: { res?: IndexRes; names: Reco
       ) : (
         <span className="figure-value empty">не рассчитан</span>
       )}
-      <IndexNotes res={notes} names={names} goTo={goTo} />
+      {!ok && <ShortNotes res={res} names={names} goTo={goTo} />}
     </section>
   );
 }
@@ -342,7 +349,7 @@ function SystemCard(props: {
 /** Причины, предупреждения и недостающие поля индекса — только фактические, с переходом к полю. */
 function IndexNotes({ res, names, goTo }: { res: IndexRes; names: Record<string, string>; goTo?: GoTo }) {
   const bad = (res.invalid_fields ?? []).filter((f) => !res.missing_fields.includes(f));
-  if (res.reasons.length === 0 && res.warnings.length === 0 && res.missing_fields.length === 0) return null;
+  if (res.reasons.length + res.warnings.length + res.missing_fields.length + bad.length === 0) return null;
   return (
     <ul className="notes">
       {res.reasons.map((r) => (
@@ -418,12 +425,63 @@ function IndexBlock({ code, res, idx, catalog, names, goTo }: {
         )}
       </div>
       {code === "acr" && <AcrSource res={res} />}
+      {code === "lqone_bioage" && show && <LqOneMeta res={res} />}
       <IndexNotes res={shown} names={names} goTo={goTo} />
     </div>
   );
 }
 
+/** Сведения об исследовании LQ One: модель, версия, достоверность, дата. */
+function LqOneMeta({ res }: { res: IndexRes }) {
+  const e = res.extra as { device_model?: string | null; software_version?: string | null; reliability_pct?: number | null; measured_on?: string | null };
+  const parts = [
+    "по заключению LQ One",
+    e.device_model ? `аппарат ${e.device_model}` : null,
+    e.software_version ? `версия ${e.software_version}` : null,
+    e.reliability_pct != null ? `достоверность ${fmt(e.reliability_pct, 1)} %` : null,
+    e.measured_on ? e.measured_on.split("-").reverse().join(".") : null,
+  ].filter(Boolean);
+  return <span className="index-expl">{parts.join(" · ")}</span>;
+}
+
 const ACR_SOURCE_RU: Record<string, string> = { lab: "готовый ACR лаборатории", calculated: "расчёт по альбумину и креатинину мочи" };
+
+/**
+ * Короткая причина в карточке возрастного показателя: ошибка в данных («Проверьте альбумин сыворотки» —
+ * переход к полю, подробное сообщение — у поля), недостающие данные, неприменимость. Различаются по виду.
+ */
+function ShortNotes({ res, names, goTo }: { res: IndexRes; names: Record<string, string>; goTo?: GoTo }) {
+  const bad = (res.invalid_fields ?? []).filter((f) => !res.missing_fields.includes(f));
+  const low = (c: string) => {
+    const n = names[c] ?? c;
+    return /^[А-ЯЁ][а-яё]/.test(n) ? n[0].toLowerCase() + n.slice(1) : n;
+  };
+  return (
+    <ul className="short-notes">
+      {res.status === "invalid_input" &&
+        (bad.length > 0 ? (
+          bad.map((f) => (
+            <li key={f} className="sn-error">
+              {goTo ? (
+                <button type="button" className="link-btn" onClick={() => goTo(f)}>Проверьте {low(f)}</button>
+              ) : (
+                <>Проверьте {low(f)}</>
+              )}
+            </li>
+          ))
+        ) : (
+          res.reasons.slice(0, 1).map((r) => <li key={r} className="sn-error">{r}</li>)
+        ))}
+      {res.missing_fields.length > 0 && (
+        <li className="sn-missing">
+          не хватает: <FieldLinks codes={res.missing_fields} names={names} goTo={goTo} />
+        </li>
+      )}
+      {(res.status === "not_applicable" || res.status === "awaiting_review") &&
+        res.reasons.map((r) => <li key={r} className="sn-na">{r}</li>)}
+    </ul>
+  );
+}
 
 /** Источник ACR и оба значения, если их два. */
 export function AcrSource({ res }: { res: IndexRes }) {
@@ -459,7 +517,7 @@ function details(code: string, res: IndexRes): string[] {
 /** Ограничения и недостающие данные: по полям, с переходом к полю; без повторов. */
 function GapsCard({ result, catalog, names, goTo }: { result: EngineResult; catalog: Catalog; names: Record<string, string>; goTo?: GoTo }) {
   const label = (c: string) => catalog.index_labels[c]?.short ?? c;
-  const skip = new Set(["asmi"]);   // модуль оборудования не подключён — в доп. разделах
+  const skip = new Set(["asmi", "lqone_bioage"]);   // показатели аппаратов необязательны — не «недостающие данные»
   const missing = new Map<string, string[]>();
   const invalid: { msg: string; fields: string[] }[] = [];
   const review: string[] = [];
@@ -559,6 +617,15 @@ export function Methodology({ result, catalog, extra, settings }: {
           вклад = коэффициент модели × оценка системы. Оценка системы объединяет Z показателей: Z = (значение −
           ожидаемое для возраста и пола) / разброс, в модель входит Z в пределах ±3. Ожидаемые значения — авторская
           нормализация, не клинические нормы. Мышечный и адаптационный профили в модель не входят.
+        </li>
+        <li>
+          Нормализация Cardio проверена 12.10.2026: ожидание SCORE2 в модели ниже риска SCORE2 даже при оптимальных
+          факторах, поэтому вклад Cardio завышен и растёт с возрастом. Замена — после данных целевой популяции.
+        </li>
+        <li>
+          Показатели аппаратов (LQ One, Visbody) отображаются как в отчёте аппарата и в LMB BioAge не входят. Правила
+          адаптационного профиля и порог достоверности LQ One не утверждены; соответствие показателя Visbody массе мышц
+          конечностей спецификацией не подтверждено. Респираторный профиль — в работе.
         </li>
         <li>Изменение оценки между визитами не означает доказанного лечебного эффекта.</li>
         <li>PhenoAge — самостоятельный показатель (Levine 2018, поправка 2019), в LMB BioAge не входит.</li>

@@ -105,6 +105,9 @@ export function Questionnaire({ encounterId, onChange }: { encounterId: string; 
                     )}
                   </span>
                 )}
+                {it.kind === "date" && (
+                  <input type="date" aria-label={it.name} value={value(it.code)} onChange={(e) => setDraft({ ...draft, [it.code]: e.target.value })} />
+                )}
                 {it.kind === "text" && (
                   <input value={value(it.code)} maxLength={50} onChange={(e) => setDraft({ ...draft, [it.code]: e.target.value })} />
                 )}

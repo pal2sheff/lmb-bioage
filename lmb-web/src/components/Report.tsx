@@ -1,13 +1,16 @@
 // Отчёт врача для печати: те же данные расчётного модуля, сведённые в таблицы.
 // PhenoAge — самостоятельный показатель; сравнения с LMB в отчёте нет (решение владельца 11.10.2026).
 // Методические пояснения — одним компактным блоком в конце (уточнение 11.10.2026, 21:24).
+// Аудит 12.10.2026: диаграмма вкладов; клинические индексы и безразмерные оценки систем — в разных частях.
 import { fmt } from "../api";
 import type { Catalog, IndexRes } from "../types";
 import { unitRu } from "../units";
-import { signed } from "./Charts";
+import { BranchContributions, signed } from "./Charts";
 import { AcrSource, DIGITS, DOMAIN_LABEL, type EngineResult, Methodology, reasonsRu } from "./ProfileView";
 import { useResearchMode } from "./TestMode";
 import { Button, StatusBadge } from "./ui";
+
+const MODEL_DOMAINS = ["cardio", "metabolic", "renal", "hepatic", "inflammation", "brain", "bone"];
 
 export function Report(props: {
   result: EngineResult;
@@ -22,6 +25,7 @@ export function Report(props: {
   const r = result.research;
   const rOk = research && r?.status === "calculated" && r.bioage_years !== null;
   const pheno = idx.get("phenoage");
+  const lq = idx.get("lqone_bioage");
   const lmbNote = !research ? "расчёт выключен" : rOk ? "" : r ? `не рассчитан${r.reasons.length ? `: ${reasonsRu(r.reasons, catalog).slice(0, 2).join("; ")}` : ""}` : "";
   return (
     <article className="report">
@@ -68,12 +72,19 @@ export function Report(props: {
               <td className="r num">{pheno?.status === "calculated" ? `${fmt(pheno.value, 1)} лет` : "—"}</td>
               <td>{pheno && pheno.status !== "calculated" ? <StatusBadge status={pheno.status} /> : null}</td>
             </tr>
+            {lq?.status === "calculated" && (
+              <tr>
+                <td><strong>Биологический возраст LQ One</strong> <span className="muted small">по заключению аппарата</span></td>
+                <td className="r num">{fmt(lq.value, 1)} лет</td>
+                <td className="small">{lqMeta(lq)}</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </section>
 
       <section className="card report-section">
-        <h2>Показатели по системам</h2>
+        <h2>Клинические индексы и показатели</h2>
         <div className="table-wrap">
           <table className="report-table">
             <thead>
@@ -82,12 +93,10 @@ export function Report(props: {
                 <th>Показатель</th>
                 <th className="r">Значение</th>
                 <th>Статус</th>
-                <th className="r">{research ? "Оценка системы" : ""}</th>
               </tr>
             </thead>
             <tbody>
               {catalog.branches.map((b) => {
-                const d = doms.get(b.code);
                 const rows = b.indices.length ? b.indices : [""];
                 return rows.map((code, i) => {
                   const res = code ? idx.get(code) : undefined;
@@ -115,50 +124,69 @@ export function Report(props: {
                       </td>
                       <td className="r num">{res ? <ReportValue code={code} res={res} /> : "—"}</td>
                       <td>{res && res.status !== "calculated" ? <StatusBadge status={res.status} /> : null}</td>
-                      {i === 0 && (
-                        <td rowSpan={rows.length} className="r num">
-                          {!research ? null : d?.status === "calculated" ? (
-                            fmt(d.score, 2)
-                          ) : (
-                            <span className="muted small">{DOMAIN_LABEL[d?.status ?? ""] ?? "—"}</span>
-                          )}
-                        </td>
-                      )}
                     </tr>
                   );
                 });
               })}
+              {(catalog.future_branches ?? []).map((b) => (
+                <tr key={b.code} className="group-start">
+                  <td>
+                    <strong>{b.name}</strong>
+                  </td>
+                  <td colSpan={3} className="muted">
+                    в работе: {b.note}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       </section>
 
-      {rOk && r.contributions && (
-        <section className="card report-section">
-          <h2>Вклады систем в LMB BioAge, лет</h2>
-          <table className="report-table compact">
+      {research && r && (
+        <section className="card report-section report-model">
+          <h2>Модельная часть: LMB BioAge</h2>
+          <div className="report-chart">
+            <BranchContributions domains={result.domains} intercept={result.intercept} delta={rOk ? r.delta_years : null}
+              interactive={false} />
+          </div>
+          <table className="report-table compact model-table">
+            <thead>
+              <tr>
+                <th>Система</th>
+                <th className="r">Оценка системы</th>
+                <th className="r">Коэффициент</th>
+                <th className="r">Вклад, лет</th>
+              </tr>
+            </thead>
             <tbody>
-              {Object.entries(r.contributions).map(([d, v]) => (
-                <tr key={d}>
-                  <td>{catalog.branches.find((b) => b.code === d)?.name ?? d}</td>
-                  <td className="r num">{signed(v, 2)}</td>
-                  <td className="muted small">{v > 0 ? "повышает расчётную оценку" : v < 0 ? "снижает расчётную оценку" : "не меняет"}</td>
-                </tr>
-              ))}
+              {MODEL_DOMAINS.map((code) => {
+                const d = doms.get(code);
+                const name = catalog.branches.find((b) => b.code === code)?.name ?? code;
+                return (
+                  <tr key={code}>
+                    <td>{name}</td>
+                    <td className="r num">{d?.status === "calculated" ? signed(d.score!, 2) : <span className="muted small">{DOMAIN_LABEL[d?.status ?? ""] ?? "—"}</span>}</td>
+                    <td className="r num">{d?.coefficient != null ? fmt(d.coefficient, 1) : "—"}</td>
+                    <td className="r num">{d?.contribution != null ? signed(d.contribution, 2) : "—"}</td>
+                  </tr>
+                );
+              })}
               <tr>
                 <td>Постоянная модели</td>
-                <td className="r num">{signed(r.intercept, 2)}</td>
                 <td />
+                <td />
+                <td className="r num">{signed(result.intercept, 2)}</td>
               </tr>
               <tr className="sum">
-                <td>
+                <td colSpan={3}>
                   <strong>Разница с календарным возрастом</strong>
                 </td>
-                <td className="r num strong">{signed(r.delta_years!, 2)}</td>
-                <td />
+                <td className="r num strong">{rOk ? signed(r.delta_years!, 2) : "не рассчитана"}</td>
               </tr>
             </tbody>
           </table>
+          <p className="muted small">Оценка системы — безразмерная (объединённые Z показателей); вклад = коэффициент × оценка.</p>
         </section>
       )}
 
@@ -168,6 +196,13 @@ export function Report(props: {
       </section>
     </article>
   );
+}
+
+function lqMeta(res: IndexRes): string {
+  const e = res.extra as { device_model?: string | null; software_version?: string | null; reliability_pct?: number | null; measured_on?: string | null };
+  return [e.device_model, e.software_version ? `версия ${e.software_version}` : null,
+    e.reliability_pct != null ? `достоверность ${fmt(e.reliability_pct, 1)} %` : null,
+    e.measured_on ? e.measured_on.split("-").reverse().join(".") : null].filter(Boolean).join(" · ");
 }
 
 /** Значение показателя в отчёте; у FRAX — оба риска и отметка о переносе из официального калькулятора. */

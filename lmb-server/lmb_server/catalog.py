@@ -40,10 +40,14 @@ QUESTIONNAIRE_ITEMS = {
     # источник ACR при наличии готового и расчётного значения (аудит 11.10.2026): выбирает врач
     "acr_source": ("Источник ACR для расчёта", ("lab", "calculated", "unknown")),
     "frax_assumed_no": ("Факторы FRAX, отмеченные врачом «нет — сведений нет»", "frax_list"),
+    # LQ One: сведения об исследовании для итогового показателя заключения (аудит 12.10.2026)
+    "lqone_device_model": ("Модель аппарата LQ One", None),
+    "lqone_software_version": ("Версия программы LQ One", None),
+    "lqone_measured_on": ("Дата измерения LQ One", "date"),
 }
 
 # Пункты, которые подтверждает только врач (пациент может ответить «не знаю»)
-DOCTOR_ONLY_ITEMS = {"acr_source", "ascvd", "ckd_known", "fh", "very_high_single_risk_factor", "acute_kidney_change",
+DOCTOR_ONLY_ITEMS = {"acr_source", "lqone_device_model", "lqone_software_version", "lqone_measured_on", "ascvd", "ckd_known", "fh", "very_high_single_risk_factor", "acute_kidney_change",
                      "creatinine_idms", "acute_liver_condition", "acute_infection", "frax_assumed_no",
                      "secondary_osteoporosis", "rheumatoid_arthritis"}
 FRAX_RISK_FACTORS = ("prior_fragility_fracture", "parent_hip_fracture", "smoking_current", "glucocorticoids",
@@ -65,6 +69,13 @@ def validate_answer(code: str, value: str) -> str | None:
         return None
     if allowed is None:
         return None if 0 < len(value) <= 50 else f"{code}: текст 1–50 символов"
+    if allowed == "date":
+        import datetime as _dt
+        try:
+            _dt.date.fromisoformat(value)
+        except ValueError:
+            return f"{code}: дата в формате ГГГГ-ММ-ДД"
+        return None
     if allowed == "frax_list":
         items = [x for x in value.split(",") if x]
         bad = set(items) - set(FRAX_RISK_FACTORS)
@@ -74,6 +85,8 @@ def validate_answer(code: str, value: str) -> str | None:
 
 # входы только PhenoAge (самостоятельный показатель): хранятся, но в LMB v0.3 не входят
 CONTROL_ONLY_INPUTS = ("wbc", "mcv", "rdw", "albumin_serum", "crp", "alp")
+# показатели аппаратов, которые только отображаются (в LMB v0.3 не входят)
+DEVICE_DISPLAY_INPUTS = ("lqone_bioage_years", "lqone_reliability_pct")
 
 
 def observation_definitions() -> list[dict]:
@@ -84,7 +97,7 @@ def observation_definitions() -> list[dict]:
         lo, hi = d.plausible if d.plausible else (None, None)
         out.append(dict(code=code, name_ru=d.name_ru, value_type="number", unit_canonical=d.canonical_unit,
                         allowed_units=sorted(d.conversions), plausible_min=lo, plausible_max=hi,
-                        in_model_inputs=code not in CONTROL_ONLY_INPUTS, in_checkup=True))
+                        in_model_inputs=code not in CONTROL_ONLY_INPUTS + DEVICE_DISPLAY_INPUTS, in_checkup=True))
     out.append(dict(code="acr_lab", name_ru="ACR лаборатории", value_type="number", unit_canonical=None,
                     allowed_units=["mg/mmol", "mg/g"], plausible_min=0, plausible_max=5000,
                     in_model_inputs=True, in_checkup=True))
@@ -101,6 +114,7 @@ OBSERVATION_GROUPS = [
     ("Дополнительные показатели для PhenoAge", ["albumin_serum", "crp", "alp"]),
     ("Минеральная плотность шейки бедра", ["fn_tscore", "fn_bmd"]),
     ("Мышцы (Visbody)", ["visbody_asm"]),
+    ("LQ One — заключение аппарата", ["lqone_bioage_years", "lqone_reliability_pct"]),
 ]
 
 QUESTIONNAIRE_GROUPS = [
@@ -110,6 +124,7 @@ QUESTIONNAIRE_GROUPS = [
     ("Образ жизни и образование", ["smoking_current", "alcohol_3plus", "physical_activity_caide", "education_years"]),
     ("Факторы FRAX", ["prior_fragility_fracture", "parent_hip_fracture", "glucocorticoids", "rheumatoid_arthritis",
                       "secondary_osteoporosis", "fn_bmd_device_make", "frax_assumed_no"]),
+    ("LQ One", ["lqone_device_model", "lqone_software_version", "lqone_measured_on"]),
 ]
 
 INDEX_LABELS = {
@@ -130,6 +145,7 @@ INDEX_LABELS = {
     "frax_kz": ("FRAX", "10-летний риск переломов, модель Казахстана"),
     "asmi": ("ASMI", "Индекс мышечной массы конечностей"),
     "phenoage": ("PhenoAge", "Фенотипический возраст (Levine 2018)"),
+    "lqone_bioage": ("LQ One", "Биологический возраст по заключению LQ One"),
 }
 
 BRANCHES = [
@@ -141,7 +157,14 @@ BRANCHES = [
     ("brain", "Brain", "Когнитивно-сосудистый профиль", ["caide"]),
     ("bone", "Bone", "Профиль риска переломов", ["frax_kz"]),
     ("muscle", "Muscle / Functional", "Мышечный и функциональный профиль", ["asmi"]),
-    ("adaptive", "Adaptive / Autonomic", "Адаптационный и вегетативный профиль", []),
+    ("adaptive", "Adaptive / Autonomic", "Адаптационный и вегетативный профиль", ["lqone_bioage"]),
+]
+
+# Ветки в разработке (решение владельца 12.10.2026: показать респираторный профиль «в работе»).
+# Не входят в девять текущих веток и в LMB; методика и ввод не подключены.
+FUTURE_BRANCHES = [
+    ("respiratory", "Respiratory", "Респираторный профиль",
+     "Спирометрия (FEV1, FVC, FEV1/FVC) с уравнениями GLI — методика и ввод готовятся; в расчёт не входит."),
 ]
 
 
@@ -168,6 +191,7 @@ def ui_catalog(definitions: list) -> dict:
         "questionnaire_groups": [{"title": t, "items": [
             {"code": c, "name": QUESTIONNAIRE_ITEMS[c][0],
              "kind": "text" if QUESTIONNAIRE_ITEMS[c][1] is None else
+                     "date" if QUESTIONNAIRE_ITEMS[c][1] == "date" else
                      "frax_list" if QUESTIONNAIRE_ITEMS[c][1] == "frax_list" else
                      "integer" if QUESTIONNAIRE_ITEMS[c][1] == "integer" else "choice",
              "range": list(INTEGER_RANGES[c]) if c in INTEGER_RANGES else None,
@@ -176,4 +200,5 @@ def ui_catalog(definitions: list) -> dict:
         "frax_risk_factors": list(FRAX_RISK_FACTORS),
         "index_labels": {k: {"short": v[0], "name": v[1]} for k, v in INDEX_LABELS.items()},
         "branches": [{"code": c, "title": t, "name": n, "indices": ix} for c, t, n, ix in BRANCHES],
+        "future_branches": [{"code": c, "title": t, "name": n, "note": note} for c, t, n, note in FUTURE_BRANCHES],
     }

@@ -207,7 +207,7 @@ def run_browser() -> None:
 
         page.get_by_role("tab", name="Профиль").click()
         page.get_by_role("button", name="Рассчитать по текущим данным").click()
-        expect(page.locator(".branch")).to_have_count(9)
+        expect(page.locator(".branch:not(.future)")).to_have_count(9)
         bone = page.locator(".branch").filter(has_text="Профиль риска переломов")
         expect(bone).to_contain_text("11,4")
         expect(bone).to_contain_text("из официального калькулятора FRAX")
@@ -227,7 +227,7 @@ def run_browser() -> None:
         assert "Клинический итог" not in page.locator("main").inner_text()        # статус — в «О методике»
         pheno = page.locator(".pheno-card")                                         # самостоятельный показатель
         expect(pheno).to_contain_text("не рассчитан")                               # нет входов PhenoAge
-        expect(pheno.locator(".notes")).to_contain_text("не хватает")
+        expect(pheno.locator(".short-notes")).to_contain_text("не хватает")
         expect(page.locator("main")).not_to_contain_text("LMB − PhenoAge")
         page.locator("#method > summary").click()
         expect(page.locator("#method")).to_contain_text("Клинический итог не рассчитан")

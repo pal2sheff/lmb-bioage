@@ -47,7 +47,9 @@ export function Bar({ value, max }: { value: number; max: number }) {
  * Вклад систем: коэффициент модели × оценка системы, в годах модели. По нажатию на систему —
  * разложение её вклада по показателям (правило объединения домена).
  */
-export function BranchContributions({ domains, intercept, delta }: { domains: DomainRes[]; intercept: number; delta: number | null }) {
+export function BranchContributions({ domains, intercept, delta, interactive = true }: {
+  domains: DomainRes[]; intercept: number; delta: number | null; interactive?: boolean;
+}) {
   const [open, setOpen] = useState<string | null>(null);
   const dom = new Map(domains.map((d) => [d.domain, d]));
   const rows = V03.map((c) => dom.get(c)).filter((d): d is DomainRes => !!d);
@@ -69,12 +71,20 @@ export function BranchContributions({ domains, intercept, delta }: { domains: Do
           const isOpen = open === d.domain;
           return (
             <li key={d.domain} className={isOpen ? "dv-item open" : "dv-item"}>
-              <button type="button" className="dv-row" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : d.domain)}
-                title={`${SYSTEM_SHORT[d.domain]}: ${signed(d.contribution!)} лет — показать показатели`}>
-                <span className="dv-label">{SYSTEM_SHORT[d.domain]}</span>
-                <Bar value={d.contribution!} max={max} />
-                <span className="dv-val num">{signed(d.contribution!)}</span>
-              </button>
+              {interactive ? (
+                <button type="button" className="dv-row" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : d.domain)}
+                  title={`${SYSTEM_SHORT[d.domain]}: ${signed(d.contribution!)} лет — показать показатели`}>
+                  <span className="dv-label">{SYSTEM_SHORT[d.domain]}</span>
+                  <Bar value={d.contribution!} max={max} />
+                  <span className="dv-val num">{signed(d.contribution!)}</span>
+                </button>
+              ) : (
+                <div className="dv-row">
+                  <span className="dv-label">{SYSTEM_SHORT[d.domain]}</span>
+                  <Bar value={d.contribution!} max={max} />
+                  <span className="dv-val num">{signed(d.contribution!)}</span>
+                </div>
+              )}
               {isOpen && (
                 <div className="dv-parts">
                   {parts.map(([code, v]) => (
@@ -199,18 +209,23 @@ function DeviationDetail({ code, t }: { code: string; t: Trajectory }) {
   );
 }
 
+/** Проценты риска (SCORE2, SCORE2-OP, FRAX): шкала отображения ограничена 0–100 %; расчёт не меняется. */
+const PERCENT_RISK = new Set(["score2", "score2_op", "frax_major"]);
+
 /** Ожидаемое значение по возрасту (±1 SD) и точка пациента — в собственных единицах показателя. */
 function TrajectoryChart({ code, t }: { code: string; t: Trajectory }) {
   const W = 420, H = 140, L = 46, R = 10, T = 10, B = 22;
+  const risk = PERCENT_RISK.has(code);
+  const lim = (v: number) => (risk ? Math.min(100, Math.max(0, v)) : v);
   const xs = t.curve.map((p) => p.age);
-  const ys = t.curve.flatMap((p) => [p.lo, p.hi]).concat(t.value);
+  const ys = t.curve.flatMap((p) => [p.lo, p.hi]).concat(t.value).map(lim);
   const x0 = Math.min(...xs), x1 = Math.max(...xs);
-  let y0 = Math.min(...ys), y1 = Math.max(...ys);
-  const pad = (y1 - y0) * 0.08 || 1;
-  y0 -= pad;
-  y1 += pad;
+  const lo = Math.min(...ys), hi = Math.max(...ys);
+  const pad = (hi - lo) * 0.08 || 1;
+  const y0 = risk ? Math.max(0, lo - pad) : lo - pad;
+  const y1 = risk ? Math.min(100, hi + pad) : hi + pad;
   const X = (a: number) => L + ((a - x0) / (x1 - x0 || 1)) * (W - L - R);
-  const Y = (v: number) => T + (1 - (v - y0) / (y1 - y0)) * (H - T - B);
+  const Y = (v: number) => T + (1 - (lim(v) - y0) / (y1 - y0)) * (H - T - B);
   const band = t.curve.map((p, i) => `${i ? "L" : "M"}${X(p.age).toFixed(1)},${Y(p.hi).toFixed(1)}`).join("") +
     t.curve.slice().reverse().map((p) => `L${X(p.age).toFixed(1)},${Y(p.lo).toFixed(1)}`).join("") + "Z";
   const line = t.curve.map((p, i) => `${i ? "L" : "M"}${X(p.age).toFixed(1)},${Y(p.expected).toFixed(1)}`).join("");
@@ -226,8 +241,8 @@ function TrajectoryChart({ code, t }: { code: string; t: Trajectory }) {
         <path className="traj-line" d={line} />
         {at && <line className="traj-gap" x1={X(t.age)} x2={X(t.age)} y1={Y(at.expected)} y2={Y(t.value)} />}
         <circle className={`traj-dot ${tone}`} cx={X(t.age)} cy={Y(t.value)} r={5.5} />
-        <text className="traj-tick" x={L - 6} y={Y(y1 - pad) + 4} textAnchor="end">{fmt(y1 - pad, d)}</text>
-        <text className="traj-tick" x={L - 6} y={Y(y0 + pad) + 4} textAnchor="end">{fmt(y0 + pad, d)}</text>
+        <text className="traj-tick" x={L - 6} y={Y(hi) + 4} textAnchor="end">{fmt(hi, d)}</text>
+        <text className="traj-tick" x={L - 6} y={Y(lo) + 4} textAnchor="end">{fmt(lo, d)}</text>
         <text className="traj-tick" x={X(x0)} y={H - 4} textAnchor="start">{x0}</text>
         <text className="traj-tick" x={X(x1)} y={H - 4} textAnchor="end">{x1} лет</text>
         <text className="traj-tick strong" x={X(t.age)} y={H - 4} textAnchor="middle">{t.age}</text>

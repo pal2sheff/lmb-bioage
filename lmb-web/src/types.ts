@@ -54,7 +54,7 @@ export interface Definition {
 export interface QItem {
   code: string;
   name: string;
-  kind: "choice" | "text" | "frax_list" | "integer";
+  kind: "choice" | "text" | "frax_list" | "integer" | "date";
   options: string[] | null;
   range?: [number, number] | null;
   doctor_only: boolean;
@@ -66,6 +66,8 @@ export interface Catalog {
   frax_risk_factors: string[];
   index_labels: Record<string, { short: string; name: string }>;
   branches: { code: string; title: string; name: string; indices: string[] }[];
+  /** ветки в разработке (показываются «в работе», в расчёт не входят) */
+  future_branches?: { code: string; title: string; name: string; note: string }[];
 }
 
 export interface Obs {
