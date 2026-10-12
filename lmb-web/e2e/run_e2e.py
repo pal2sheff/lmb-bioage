@@ -208,37 +208,35 @@ def run_browser() -> None:
         page.get_by_role("tab", name="Профиль").click()
         page.get_by_role("button", name="Рассчитать по текущим данным").click()
         expect(page.locator(".branch")).to_have_count(9)
-        lmb = page.locator(".age-card").filter(has_text="LMB BioAge")
-        expect(lmb).to_contain_text("Клинический итог не рассчитан")           # клинический итог — строкой
         bone = page.locator(".branch").filter(has_text="Профиль риска переломов")
         expect(bone).to_contain_text("11,4")
-        expect(bone).to_contain_text("Перенесено из официального калькулятора FRAX")
+        expect(bone).to_contain_text("из официального калькулятора FRAX")
         renal = page.locator(".branch").filter(has_text="Почечный профиль")
         expect(renal.locator(".index-val").first).not_to_have_text("—")
-        expect(renal.locator(".z-line")).to_contain_text("Z eGFR")          # Z-оценки v0.3 по входам
-        expect(renal.locator(".domain-line")).not_to_contain_text("не хватает")
+        assert "Z " not in page.locator(".branch-grid").inner_text()       # Z — только на диаграмме
         brain = page.locator(".branch").filter(has_text="Когнитивно-сосудистый профиль")
         expect(brain).to_contain_text("вне области модели CAIDE")           # 66 лет: CAIDE 39–64
-        charts = page.locator("section[aria-labelledby=dv-branches]")       # графики общие с калькулятором
+        charts = page.locator("section[aria-labelledby=dv-branches]")       # графики общие с калькулятором, видны сразу
         expect(charts.locator(".dv-row").filter(has_text="Почечный")).not_to_have_class("dv-row is-missing")
-        expect(charts.locator(".dv-row.is-missing").filter(has_text="Когнитивно")).to_contain_text("нет вклада")
+        expect(charts.locator(".dv-row.is-missing").filter(has_text="Когнитивно")).to_contain_text("вне области")
         expect(page.locator(".dev-grid .dev-row").filter(has_text="eGFR")).to_have_count(1)
-        card = page.locator(".age-card.research-card")                       # исследовательский режим включён
+        card = page.locator(".age-summary")
         expect(card.locator(".figure").first).to_contain_text("66")                 # календарный возраст
-        expect(card).to_contain_text("не рассчитана")                               # 66 лет: вне области 40–64
-        expect(card.locator(".reason-list")).to_contain_text("вне технической области тестирования 40–64")
-        expect(card.locator(".research-chip")).to_be_visible()
-        pheno = page.locator(".age-card").filter(has_text="PhenoAge")              # самостоятельный показатель
+        expect(card).to_contain_text("не рассчитан")                                # 66 лет: вне области 40–64
+        expect(card.locator(".why")).to_contain_text("вне технической области тестирования 40–64")
+        assert "Клинический итог" not in page.locator("main").inner_text()        # статус — в «О методике»
+        pheno = page.locator(".pheno-card")                                         # самостоятельный показатель
         expect(pheno).to_contain_text("не рассчитан")                               # нет входов PhenoAge
         expect(pheno.locator(".notes")).to_contain_text("не хватает")
         expect(page.locator("main")).not_to_contain_text("LMB − PhenoAge")
-        page.get_by_text("Подробности расчёта").click()
-        expect(page.locator(".details-card").last).to_contain_text("Редакция модели")
+        page.locator("#method > summary").click()
+        expect(page.locator("#method")).to_contain_text("Клинический итог не рассчитан")
+        expect(page.locator("#method")).to_contain_text("Редакция модели")
         page.get_by_role("button", name="Проверить воспроизводимость").click()
         expect(page.get_by_text("результат совпадает полностью")).to_be_visible()
         page.wait_for_timeout(800)  # дождаться анимации появления карточек
         page.screenshot(path=SHOTS / "06_profile.png", full_page=True)
-        step("профиль 9 веток, Z-оценки v0.3, графики, LMB: неприменим вне 40–64 (с причиной), PhenoAge — отдельно, без входов не считается, метаданные в подробностях, расчёт воспроизводится")
+        step("профиль 9 веток без Z в карточках, графики сразу, LMB: неприменим вне 40–64 (с причиной), PhenoAge — отдельно, без входов не считается, статус и метаданные в «О методике», расчёт воспроизводится")
 
         page.set_viewport_size({"width": 390, "height": 844})
         page.wait_for_timeout(300)

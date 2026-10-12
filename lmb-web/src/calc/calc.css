@@ -1,5 +1,5 @@
 /* — браузерный калькулятор: разделы, одна прокрутка страницы — */
-.calc-main { max-width: 1280px; }
+.calc-main { max-width: 1280px; padding-top: 16px; }
 .calc-toolbar { margin-bottom: 8px; }
 .input-grid { columns: 2; column-gap: 20px; margin-top: 16px; }
 .input-card { padding: 24px 28px; break-inside: avoid; margin-bottom: 20px; display: block; }
